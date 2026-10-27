@@ -1,0 +1,33 @@
+name: Buscar vagas
+
+on:
+  schedule:
+    - cron: "0 11 */3 * *"   # 11h UTC = 8h de Brasília, a cada 3 dias
+  workflow_dispatch:          # permite rodar manualmente pelo botão
+
+permissions:
+  contents: write
+
+jobs:
+  vagas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Buscar vagas
+        run: python buscar_vagas.py
+
+      - name: Salvar no repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "vagas $(date +%F)"
+          git push
