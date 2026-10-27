@@ -89,21 +89,58 @@ def recente(txt_data, agora) -> bool:
 
 
 # ------------------------------- FONTES ---------------------------------
+GUPY_ENDPOINTS = [
+    "https://employability-portal.gupy.io/api/v1/jobs",
+    "https://portal.api.gupy.io/api/v1/jobs",
+]
+
+
+def _extrair_lista(corpo):
+    """A API pode devolver a lista em chaves diferentes; tenta as comuns."""
+    if isinstance(corpo, list):
+        return corpo
+    if isinstance(corpo, dict):
+        for chave in ("data", "results", "jobs", "items"):
+            if isinstance(corpo.get(chave), list):
+                return corpo[chave]
+    return []
+
+
+def _pegar(d, *chaves):
+    for c in chaves:
+        v = d.get(c)
+        if v:
+            return str(v).strip()
+    return ""
+
+
 def buscar_gupy(agora):
     vagas = []
+    endpoint = None
+    primeira_resposta = True
     for termo in BUSCAS_GUPY:
-        for offset in (0, 50):
-            try:
-                r = requests.get(
-                    "https://portal.api.gupy.io/api/job",
-                    params={"name": termo, "limit": 50, "offset": offset},
-                    headers=HEADERS, timeout=30,
-                )
-                r.raise_for_status()
-                itens = r.json().get("data", [])
-            except Exception as e:
-                print(f"[aviso] Gupy '{termo}' offset {offset}: {e}")
-                continue
+        for offset in (0, 100):
+            params = {"jobName": termo, "limit": 100, "offset": offset}
+            itens = None
+            for url_api in ([endpoint] if endpoint else GUPY_ENDPOINTS):
+                try:
+                    r = requests.get(url_api, params=params, headers=HEADERS, timeout=30)
+                    r.raise_for_status()
+                    corpo = r.json()
+                except Exception as e:
+                    print(f"[aviso] Gupy {url_api} '{termo}' offset {offset}: {e}")
+                    continue
+                endpoint = url_api
+                itens = _extrair_lista(corpo)
+                if primeira_resposta:
+                    primeira_resposta = False
+                    chaves = list(corpo.keys()) if isinstance(corpo, dict) else "lista"
+                    print(f"[debug] Gupy OK em {url_api}; chaves da resposta: {chaves}")
+                    if itens:
+                        print(f"[debug] campos de uma vaga: {sorted(itens[0].keys())}")
+                break
+            if itens is None:
+                break  # termo falhou em todos os endpoints
             for j in itens:
                 if not recente(j.get("publishedDate"), agora):
                     continue
@@ -111,12 +148,16 @@ def buscar_gupy(agora):
                 if j.get("isRemoteWork"):
                     modelo = "remote"
                 vagas.append({
-                    "titulo": j.get("name", "").strip(),
-                    "empresa": j.get("careerPageName", "").strip(),
-                    "url": j.get("jobUrl", ""),
+                    "titulo": _pegar(j, "name", "title"),
+                    "empresa": _pegar(j, "careerPageName", "company", "companyName"),
+                    "url": _pegar(j, "jobUrl", "applyUrl", "url"),
                     "modelo": modelo,
                 })
+            if len(itens) < 100:
+                break
             time.sleep(1)
+        time.sleep(1)
+    print(f"[info] Gupy: {len(vagas)} vagas recentes coletadas")
     return vagas
 
 
