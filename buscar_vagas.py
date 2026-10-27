@@ -32,7 +32,8 @@ ARQ_HISTORICO = RAIZ / "docs" / "data" / "vagas.json"   # alimenta o site
 DIAS_MANTER_TXT = 7        # apaga .txt mais antigos que isso
 DIAS_MANTER_VISTAS = 45    # esquece links vistos há mais tempo que isso
 DIAS_HISTORICO = 60        # vagas some do site se não forem vistas há X dias
-DIAS_VAGA_RECENTE = 10     # ignora vagas publicadas há mais de X dias
+DIAS_COLETA_SITE = 30      # o site recebe vagas publicadas nos últimos X dias
+DIAS_VAGA_RECENTE = 10     # o .txt do WhatsApp só traz vagas publicadas nos últimos X dias
 SOMENTE_REMOTO = False     # True = só vagas 100% remotas
 
 BUSCAS_GUPY = [
@@ -162,9 +163,10 @@ def parse_data(txt):
         return None
 
 
-def recente(txt_data, agora) -> bool:
+def recente(txt_data, agora, dias=None) -> bool:
     d = parse_data(txt_data)
-    return True if d is None else (agora - d) <= timedelta(days=DIAS_VAGA_RECENTE)
+    dias = DIAS_COLETA_SITE if dias is None else dias
+    return True if d is None else (agora - d) <= timedelta(days=dias)
 
 
 # ------------------------------- FONTES ---------------------------------
@@ -432,6 +434,8 @@ def main():
                     sem_local += 1
         if SOMENTE_REMOTO and v["modelo"] != "remote":
             vai_pro_whats = False
+        if not recente(v.get("publicada"), agora, DIAS_VAGA_RECENTE):
+            vai_pro_whats = False   # vaga mais antiga: só no site
 
         todas.append(v)                                   # site: tudo
         if vai_pro_whats and v["url"] not in vistas:      # WhatsApp: filtrado e sem repetir

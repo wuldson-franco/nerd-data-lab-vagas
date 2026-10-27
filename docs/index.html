@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nerd Data Lab | Radar de vagas de dados</title>
+<meta name="description" content="Vagas de dados coletadas automaticamente: filtre por nível, modelo de trabalho, região e área.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF2EC; --grid:#D2DBD1; --ink:#17262B; --ink2:#4A5C61; --line:#C3CEC3;
+  --acento:#1E6F7A; --marca:#F3E08A; --foco:#2F5BEA;
+  --jr:#2E9F6B; --pl:#2F5BEA; --sr:#7A4FD6; --es:#D9930D; --nd:#8A9A9A;
+  --fonte:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#101A1D; --grid:#1C2A2E; --ink:#E7EFE9; --ink2:#9DB0B4; --line:#2B3B40;
+    --acento:#5FC0CB; --marca:#5A5020; --foco:#8FA8FF;
+    --jr:#4CC38A; --pl:#6B8CFF; --sr:#A68BF0; --es:#F0B33B; --nd:#7C8D90;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--fonte);font-size:16px;line-height:1.5;font-optical-sizing:auto}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--foco);outline-offset:2px;border-radius:2px}
+.miolo{max-width:1180px;margin:0 auto;padding:0 20px}
+
+/* ---------- topo: papel milimetrado + frase-filtro ---------- */
+.topo{position:relative;isolation:isolate;padding:22px 0 30px}
+.topo::before{content:"";position:absolute;inset:0;z-index:-1;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:28px 28px;
+  -webkit-mask-image:linear-gradient(#000 40%,transparent);mask-image:linear-gradient(#000 40%,transparent)}
+.marca-linha{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
+.logo{font-weight:800;font-size:1.05rem;letter-spacing:-.01em}
+.atual{color:var(--ink2);font-size:.88rem}
+.frase{margin:34px 0 0;font-weight:500;font-size:clamp(1.55rem,3.6vw,2.7rem);line-height:1.5;letter-spacing:-.015em;max-width:30ch}
+@media (min-width:900px){.frase{max-width:34ch}}
+.frase .num{font-weight:800;font-size:1.35em;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.frase select{
+  appearance:none;-webkit-appearance:none;font:inherit;font-weight:700;color:var(--ink);cursor:pointer;
+  background-color:transparent;border:0;border-bottom:3px solid var(--acento);border-radius:0;
+  padding:0 1.15em 0 .1em;margin:0;max-width:100%;field-sizing:content;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1.5l6 6 6-6' fill='none' stroke='%231E6F7A' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right .1em center;
+}
+.frase select.ativo{background-color:var(--marca)}
+.frase select option{font-weight:500;font-size:1rem;color:#17262B;background:#fff}
+.extras{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-top:26px}
+.extras input[type=search],.extras select{
+  font:inherit;font-size:.95rem;color:var(--ink);background:transparent;border:1.5px solid var(--line);
+  border-radius:8px;padding:8px 12px;min-height:42px}
+.extras input[type=search]{flex:1 1 240px;max-width:380px}
+.extras select option{color:#17262B;background:#fff}
+.extras input:focus,.extras select:focus{border-color:var(--acento)}
+.botao{font:inherit;font-size:.95rem;font-weight:600;color:var(--ink);background:transparent;border:1.5px solid var(--ink);
+  border-radius:8px;padding:8px 14px;min-height:42px;cursor:pointer}
+.botao:hover{background:var(--ink);color:var(--paper)}
+.chip{font:inherit;font-size:.9rem;font-weight:600;background:var(--marca);color:var(--ink);border:0;border-radius:999px;padding:7px 14px;cursor:pointer;min-height:42px}
+.resumo{display:flex;flex-wrap:wrap;gap:6px 28px;margin-top:22px;color:var(--ink2);font-size:.95rem}
+.resumo b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ---------- painéis de gráficos ---------- */
+.painel{display:grid;grid-template-columns:minmax(0,1fr);gap:34px;padding:26px 0 10px}
+.bloco{min-width:0}
+@media (min-width:900px){
+  .painel{grid-template-columns:repeat(12,minmax(0,1fr));gap:34px 40px}
+  .bloco{grid-column:span 12}
+  .b-nivel{grid-column:span 4}.b-modelo{grid-column:span 3}.b-regiao{grid-column:span 5}
+  .b-area{grid-column:span 4}.b-estado{grid-column:span 4}.b-emp{grid-column:span 4}.b-tempo{grid-column:span 12}
+}
+.bloco h2{margin:0 0 10px;font-size:1rem;font-weight:700;letter-spacing:-.005em;padding-top:12px;border-top:2px solid var(--ink)}
+.bloco h2 small{font-weight:400;color:var(--ink2);font-size:.85rem;margin-left:6px}
+.barra{display:grid;grid-template-columns:minmax(6.5rem,47%) 1fr auto;align-items:center;gap:10px;width:100%;
+  font:inherit;font-size:.93rem;color:var(--ink);background:none;border:0;text-align:left;padding:5px 0;cursor:pointer;
+  min-height:34px;transition:opacity .2s}
+.barra:hover .rot{text-decoration:underline}
+.barra.apagada{opacity:.4}
+.barra.apagada:hover,.barra.apagada:focus-visible{opacity:.85}
+.barra .rot{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.barra.ativa .rot{font-weight:700}
+.trilho{height:16px;background:color-mix(in srgb,var(--ink) 7%,transparent);border-radius:3px;overflow:hidden}
+.preench{display:block;height:100%;width:var(--w);background:var(--c);border-radius:3px;transition:width .35s ease}
+.carregando .preench{width:0}
+.val{font-variant-numeric:tabular-nums;font-weight:700;min-width:2.2ch;text-align:right}
+.vazio{margin:6px 0;color:var(--ink2);font-size:.93rem}
+
+.tempo{display:flex;align-items:flex-end;gap:3px;height:190px;padding-bottom:22px;position:relative}
+.col{flex:1 1 0;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;position:relative}
+.col.fora{opacity:.28}
+.pilha{display:flex;flex-direction:column;justify-content:flex-end;min-height:0;transition:height .35s ease}
+.pilha i{display:block;min-height:2px}
+.col .eixo{position:absolute;left:50%;bottom:-22px;transform:translateX(-50%);font-size:.72rem;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.carregando .pilha{height:0!important}
+
+/* ---------- lista de vagas ---------- */
+.lista-cab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:34px 0 0;padding-top:12px;border-top:2px solid var(--ink)}
+.lista-cab h2{margin:0;font-size:1rem;font-weight:700}
+.lista-cab span{color:var(--ink2);font-size:.88rem}
+.vagas{list-style:none;margin:8px 0 0;padding:0}
+.cab,.vaga{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1.3fr) minmax(0,1.5fr) minmax(0,.95fr) minmax(0,1.3fr) minmax(0,.7fr) 3.2rem;gap:4px 16px;align-items:baseline}
+.cab{color:var(--ink2);font-size:.82rem;padding:6px 0;border-bottom:1px solid var(--line)}
+.vaga{padding:11px 0;border-bottom:1px solid var(--line);font-size:.93rem}
+.vaga .tit{font-weight:650;text-decoration-thickness:1.5px;text-underline-offset:3px;text-decoration-color:var(--line)}
+.vaga .tit:hover{text-decoration-color:var(--acento)}
+.vaga>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vaga .niv{display:inline-flex;align-items:center;gap:7px}
+.ponto{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.vaga .dat,.cab .dat{text-align:right;font-variant-numeric:tabular-nums}
+.mais{display:block;margin:22px auto 0}
+@media (max-width:860px){
+  .cab{display:none}
+  .vaga{grid-template-columns:1fr auto;grid-template-areas:"tit tit" "emp dat" "onde onde" "meta meta"}
+  .vaga .tit{grid-area:tit;white-space:normal}
+  .vaga .emp{grid-area:emp;color:var(--ink2)}
+  .vaga .dat{grid-area:dat}
+  .vaga .onde{grid-area:onde}
+  .vaga .are,.vaga .fon{display:none}
+  .vaga .niv{grid-area:meta}
+  .vaga>span{white-space:normal}
+}
+.aviso{margin:30px 0 0;padding:18px 20px;border-left:4px solid var(--es);background:color-mix(in srgb,var(--es) 12%,transparent)}
+.aviso p{margin:0 0 6px}.aviso p:last-child{margin:0}
+.rodape{margin:48px 0 40px;padding-top:14px;border-top:1px solid var(--line);color:var(--ink2);font-size:.85rem;max-width:70ch}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.preench,.pilha,.barra{transition:none}}
+</style>
+</head>
+<body class="carregando">
+
+<header class="topo">
+  <div class="miolo">
+    <div class="marca-linha">
+      <span class="logo">Nerd Data Lab</span>
+      <span class="atual" id="atual"></span>
+    </div>
+
+    <h1 class="frase" id="frase">
+      <span class="num" id="total">0</span> <span id="plural">vagas</span> de
+      <select id="fArea" aria-label="Área"></select>,
+      nível <select id="fNivel" aria-label="Nível"></select>,
+      <select id="fModelo" aria-label="Modelo de trabalho"></select>,
+      em <select id="fRegiao" aria-label="Região ou estado"></select>,
+      publicadas <select id="fPeriodo" aria-label="Período de publicação"></select>.
+    </h1>
+
+    <div class="extras">
+      <input type="search" id="fBusca" placeholder="Buscar por cargo ou empresa" aria-label="Buscar por cargo ou empresa" autocomplete="off">
+      <select id="fFonte" aria-label="Fonte"></select>
+      <button type="button" class="chip" id="chipEmpresa" hidden></button>
+      <button type="button" class="botao" id="limpar" hidden>Limpar filtros</button>
+    </div>
+    <div class="resumo" id="resumo" aria-live="polite"></div>
+  </div>
+</header>
+
+<main class="miolo">
+  <div class="aviso" id="aviso" hidden></div>
+
+  <div id="conteudo">
+    <section class="painel" aria-label="Gráficos">
+      <div class="bloco b-nivel"><h2>Por nível</h2><div id="gNivel"></div></div>
+      <div class="bloco b-modelo"><h2>Por modelo</h2><div id="gModelo"></div></div>
+      <div class="bloco b-regiao"><h2>Presencial e híbrido por região</h2><div id="gRegiao"></div></div>
+      <div class="bloco b-area"><h2>Por área</h2><div id="gArea"></div></div>
+      <div class="bloco b-estado"><h2>Presencial e híbrido por estado</h2><div id="gEstado"></div></div>
+      <div class="bloco b-emp"><h2>Empresas com mais vagas</h2><div id="gEmp"></div></div>
+      <div class="bloco b-tempo"><h2>Vagas por dia de publicação <small id="legendaTempo"></small></h2><div class="tempo" id="gTempo"></div></div>
+    </section>
+
+    <div class="lista-cab"><h2>Vagas</h2><span id="contaLista"></span></div>
+    <div class="cab" aria-hidden="true">
+      <span>Cargo</span><span>Empresa</span><span>Onde</span><span>Nível</span><span>Área</span><span>Fonte</span><span class="dat">Data</span>
+    </div>
+    <ul class="vagas" id="lista"></ul>
+    <button type="button" class="botao mais" id="mais" hidden>Mostrar mais vagas</button>
+  </div>
+
+  <p class="rodape">Os dados são coletados automaticamente do Gupy e do Remotive e mantidos por 60 dias. Algumas vagas podem já ter sido encerradas: confirme no link antes de se candidatar. Aqui entram vagas de todo o Brasil: use os filtros para escolher modelo, região ou estado. A lista enviada na comunidade traz as remotas e as presenciais ou híbridas de João Pessoa, Campina Grande, Recife, Natal e regiões.</p>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = s => document.querySelector(s);
+  const NIVEIS = [["Júnior","jr"],["Pleno","pl"],["Sênior","sr"],["Estágio","es"],["Nível não informado","nd"]];
+  const ROTULO_NIVEL = {"Nível não informado":"Sem nível"};
+  const MODELOS = [["remote","Remoto"],["hybrid","Híbrido"],["on-site","Presencial"]];
+  const REGIOES = ["João Pessoa e região","Campina Grande e região","Recife e região","Natal e região"];
+  const OUTRAS = "Outras regiões";
+  const CHAVES = ["q","area","nivel","modelo","regiao","estado","fonte","empresa","periodo"];
+  const state = {q:"",area:"",nivel:"",modelo:"",regiao:"",estado:"",fonte:"",empresa:"",periodo:""};
+  const UF = {"acre":"AC","alagoas":"AL","amapa":"AP","amazonas":"AM","bahia":"BA","ceara":"CE","distrito federal":"DF","espirito santo":"ES","goias":"GO","maranhao":"MA","mato grosso":"MT","mato grosso do sul":"MS","minas gerais":"MG","para":"PA","paraiba":"PB","parana":"PR","pernambuco":"PE","piaui":"PI","rio de janeiro":"RJ","rio grande do norte":"RN","rio grande do sul":"RS","rondonia":"RO","roraima":"RR","santa catarina":"SC","sao paulo":"SP","sergipe":"SE","tocantins":"TO"};
+  const POR_PAGINA = 40;
+  let dados = [], limite = POR_PAGINA;
+
+  const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const norm = t => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const diaDe = iso => Date.UTC(+iso.slice(0,4), +iso.slice(5,7) - 1, +iso.slice(8,10)) / 864e5;
+  const fmt = iso => iso ? iso.slice(8,10) + "/" + iso.slice(5,7) : "";
+  const fmtDia = d => { const s = new Date(d * 864e5).toISOString(); return s.slice(8,10) + "/" + s.slice(5,7); };
+  const agora = new Date();
+  const HOJE = Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate()) / 864e5;
+  const classeNivel = n => (NIVEIS.find(x => x[0] === n) || NIVEIS[4])[1];
+  const rotuloNivel = n => ROTULO_NIVEL[n] || n;
+  const uf = e => UF[norm(e)] || e;
+  const rotuloModelo = m => (MODELOS.find(x => x[0] === m) || ["", m])[1];
+
+  /* ---------- filtro (cada gráfico ignora a própria dimensão para mostrar alternativas) ---------- */
+  function passa(v, ignora) {
+    const s = state;
+    if (ignora !== "q" && s.q && !v._busca.includes(norm(s.q))) return false;
+    if (ignora !== "area" && s.area && v.area !== s.area) return false;
+    if (ignora !== "nivel" && s.nivel && v.nivel !== s.nivel) return false;
+    if (ignora !== "modelo" && s.modelo && v.modelo !== s.modelo) return false;
+    if (ignora !== "regiao" && s.regiao && v.regiao !== s.regiao) return false;
+    if (ignora !== "estado" && s.estado && v.estado !== s.estado) return false;
+    if (ignora !== "fonte" && s.fonte && v.fonte !== s.fonte) return false;
+    if (ignora !== "empresa" && s.empresa && v.empresa !== s.empresa) return false;
+    if (ignora !== "periodo" && s.periodo && v._dia < HOJE - (+s.periodo)) return false;
+    return true;
+  }
+  function contar(ignora, chave, filtro) {
+    const m = new Map();
+    for (const v of dados) {
+      if (!passa(v, ignora) || (filtro && !filtro(v))) continue;
+      const k = chave(v);
+      if (!k) continue;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return m;
+  }
+
+  /* ---------- gráficos ---------- */
+  function barras(id, itens, dim) {
+    const el = $(id), sel = state[dim];
+    const max = Math.max(1, ...itens.map(i => i.n));
+    if (!itens.length || itens.every(i => !i.n && sel !== i.chave)) {
+      el.innerHTML = '<p class="vazio">Sem vagas neste recorte.</p>';
+      return;
+    }
+    el.innerHTML = itens.map(i => {
+      const ativo = sel === i.chave;
+      return `<button type="button" class="barra${ativo ? " ativa" : ""}${sel && !ativo ? " apagada" : ""}" data-dim="${dim}" data-key="${esc(i.chave)}" aria-pressed="${ativo}">
+        <span class="rot" title="${esc(i.rotulo)}">${esc(i.rotulo)}</span>
+        <span class="trilho"><span class="preench" style="--w:${(i.n / max * 100).toFixed(1)}%;--c:${i.cor}"></span></span>
+        <span class="val">${i.n}</span></button>`;
+    }).join("");
+  }
+  function ordenado(mapa, dim, cor, limiteN) {
+    let itens = [...mapa].map(([k, n]) => ({chave: k, rotulo: k, n, cor}));
+    itens.sort((a, b) => b.n - a.n || a.rotulo.localeCompare(b.rotulo, "pt-BR"));
+    if (limiteN) itens = itens.slice(0, limiteN);
+    const sel = state[dim];
+    if (sel && !itens.some(i => i.chave === sel)) itens.push({chave: sel, rotulo: sel, n: mapa.get(sel) || 0, cor});
+    return itens;
+  }
+  function graficoTempo() {
+    const el = $("#gTempo");
+    const base = dados.filter(v => passa(v, "periodo"));
+    if (!base.length) { el.innerHTML = '<p class="vazio">Sem vagas neste recorte.</p>'; $("#legendaTempo").textContent = ""; return; }
+    const minDia = Math.min(...base.map(v => v._dia));
+    const span = Math.max(7, Math.min(45, HOJE - minDia + 1));
+    const dias = Array.from({length: span}, (_, i) => HOJE - (span - 1 - i));
+    const porDia = new Map(dias.map(d => [d, {total: 0, n: {}}]));
+    for (const v of base) {
+      const o = porDia.get(v._dia);
+      if (!o) continue;
+      o.total++; o.n[v.nivel] = (o.n[v.nivel] || 0) + 1;
+    }
+    const max = Math.max(1, ...[...porDia.values()].map(o => o.total));
+    const corte = state.periodo ? HOJE - (+state.periodo) : -Infinity;
+    const passo = span > 30 ? 7 : span > 14 ? 5 : 2;
+    el.innerHTML = dias.map((d, i) => {
+      const o = porDia.get(d);
+      const segs = NIVEIS.slice().reverse().map(([nome, cl]) => o.n[nome]
+        ? `<i style="flex:${o.n[nome]};background:var(--${cl})"></i>` : "").join("");
+      const eixo = (span - 1 - i) % passo === 0 ? `<span class="eixo">${fmtDia(d)}</span>` : "";
+      return `<div class="col${d < corte ? " fora" : ""}" title="${fmtDia(d)}: ${o.total} ${o.total === 1 ? "vaga" : "vagas"}">
+        <div class="pilha" style="height:${(o.total / max * 100).toFixed(1)}%">${segs}</div>${eixo}</div>`;
+    }).join("");
+    $("#legendaTempo").textContent = "últimos " + span + " dias, cores como no gráfico de nível";
+  }
+
+  /* ---------- lista ---------- */
+  function ondeTexto(v) {
+    if (v.modelo === "remote") return "Remoto";
+    const local = v.cidade ? v.cidade + (v.estado ? " - " + uf(v.estado) : "") : (v.estado || (v.regiao !== OUTRAS ? v.regiao : ""));
+    return rotuloModelo(v.modelo) + (local ? ", " + local : "");
+  }
+  function lista(filtradas) {
+    const ul = $("#lista");
+    $("#contaLista").textContent = filtradas.length ? `mostrando ${Math.min(limite, filtradas.length)} de ${filtradas.length}` : "";
+    if (!filtradas.length) {
+      ul.innerHTML = '<li class="vazio" style="padding:14px 0">Nenhuma vaga com esses filtros. Tente tirar algum deles.</li>';
+      $("#mais").hidden = true;
+      return;
+    }
+    ul.innerHTML = filtradas.slice(0, limite).map(v => `<li class="vaga">
+      <a class="tit" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">${esc(v.titulo)}</a>
+      <span class="emp" title="${esc(v.empresa)}">${esc(v.empresa)}</span>
+      <span class="onde">${esc(ondeTexto(v))}</span>
+      <span class="niv"><i class="ponto" style="background:var(--${classeNivel(v.nivel)})"></i>${esc(rotuloNivel(v.nivel))}</span>
+      <span class="are">${esc(v.area)}</span>
+      <span class="fon">${esc(v.fonte)}</span>
+      <span class="dat">${fmt(v.publicada)}</span></li>`).join("");
+    $("#mais").hidden = filtradas.length <= limite;
+  }
+
+  /* ---------- render geral ---------- */
+  function render() {
+    const filtradas = dados.filter(v => passa(v));
+    const n = filtradas.length;
+    $("#total").textContent = n.toLocaleString("pt-BR");
+    $("#plural").textContent = n === 1 ? "vaga" : "vagas";
+
+    const remotas = filtradas.filter(v => v.modelo === "remote").length;
+    const empresas = new Set(filtradas.map(v => v.empresa)).size;
+    const datas = filtradas.map(v => v.publicada).sort();
+    $("#resumo").innerHTML = n
+      ? `<span><b>${Math.round(remotas / n * 100)}%</b> remotas</span><span><b>${empresas}</b> ${empresas === 1 ? "empresa" : "empresas"}</span><span>publicadas de <b>${fmt(datas[0])}</b> a <b>${fmt(datas[datas.length - 1])}</b></span>`
+      : "";
+
+    // gráficos
+    const mNivel = contar("nivel", v => v.nivel);
+    barras("#gNivel", NIVEIS.map(([nome, cl]) => ({chave: nome, rotulo: rotuloNivel(nome), n: mNivel.get(nome) || 0, cor: `var(--${cl})`})), "nivel");
+    const mModelo = contar("modelo", v => v.modelo);
+    barras("#gModelo", MODELOS.map(([k, r]) => ({chave: k, rotulo: r, n: mModelo.get(k) || 0, cor: "var(--acento)"})), "modelo");
+    const mRegiao = contar("regiao", v => v.regiao, v => v.modelo !== "remote");
+    const regioes = [...REGIOES, OUTRAS].map(r => ({chave: r, rotulo: r, n: mRegiao.get(r) || 0, cor: "var(--acento)"}));
+    if (!regioes.some(r => r.n) && state.regiao === "") {
+      $("#gRegiao").innerHTML = '<p class="vazio">Sem vagas presenciais ou híbridas neste recorte.</p>';
+    } else barras("#gRegiao", regioes, "regiao");
+    barras("#gArea", ordenado(contar("area", v => v.area), "area", "var(--acento)"), "area");
+    barras("#gEstado", ordenado(contar("estado", v => v.estado, v => v.modelo !== "remote"), "estado", "var(--acento)", 10), "estado");
+    barras("#gEmp", ordenado(contar("empresa", v => v.empresa), "empresa", "var(--acento)", 10), "empresa");
+    graficoTempo();
+    lista(filtradas);
+
+    // controles
+    $("#fArea").value = state.area; $("#fNivel").value = state.nivel; $("#fModelo").value = state.modelo;
+    $("#fRegiao").value = state.regiao ? "r:" + state.regiao : state.estado ? "e:" + state.estado : ""; $("#fPeriodo").value = state.periodo; $("#fFonte").value = state.fonte;
+    for (const id of ["#fArea","#fNivel","#fModelo","#fRegiao","#fPeriodo"]) $(id).classList.toggle("ativo", !!$(id).value);
+    $("#fBusca").value = state.q;
+    const chip = $("#chipEmpresa");
+    chip.hidden = !state.empresa;
+    chip.textContent = state.empresa ? "Empresa: " + state.empresa + "  ×" : "";
+    $("#limpar").hidden = !CHAVES.some(k => state[k]);
+    guardarHash();
+  }
+
+  /* ---------- endereço compartilhável (#nivel=Pleno&modelo=remote) ---------- */
+  function guardarHash() {
+    const p = new URLSearchParams();
+    CHAVES.forEach(k => state[k] && p.set(k, state[k]));
+    const h = p.toString();
+    try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) {}
+  }
+  function lerHash() {
+    const p = new URLSearchParams(location.hash.slice(1));
+    CHAVES.forEach(k => { if (p.has(k)) state[k] = p.get(k); });
+    if (state.regiao && state.estado) state.estado = "";
+  }
+
+  /* ---------- montagem ---------- */
+  function opcoes(sel, lista) {
+    sel.innerHTML = lista.map(([v, r]) => `<option value="${esc(v)}">${esc(r)}</option>`).join("");
+  }
+  function iniciar(json) {
+    dados = (json.vagas || []).map(v => ({...v, estado: v.modelo === "remote" ? "" : (v.estado || ""), _dia: diaDe(v.publicada), _busca: norm(v.titulo + " " + v.empresa + " " + (v.cidade || ""))}));
+    if (json.atualizado_em) $("#atual").textContent = `Atualizado em ${fmt(json.atualizado_em.slice(0,10))} às ${json.atualizado_em.slice(11,16)}`;
+    if (!dados.length) {
+      $("#conteudo").hidden = true;
+      $("#frase").hidden = true;
+      document.querySelector(".extras").hidden = true;
+      const a = $("#aviso"); a.hidden = false;
+      a.innerHTML = "<p><b>Ainda não há vagas coletadas.</b></p><p>No GitHub, abra Actions, escolha Buscar vagas e clique em Run workflow. Esta página se preenche quando a execução terminar.</p>";
+      document.body.classList.remove("carregando");
+      return;
+    }
+    const areas = [...contar(null, v => v.area)].sort((a, b) => b[1] - a[1]).map(([a]) => [a, a]);
+    opcoes($("#fArea"), [["", "qualquer área"], ...areas]);
+    opcoes($("#fNivel"), [["", "qualquer nível"], ...NIVEIS.map(([n]) => [n, rotuloNivel(n).toLowerCase()])]);
+    opcoes($("#fModelo"), [["", "qualquer modelo"], ["remote", "remoto"], ["hybrid", "híbrido"], ["on-site", "presencial"]]);
+    const estados = [...new Set(dados.map(v => v.estado).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    $("#fRegiao").innerHTML = '<option value="">qualquer lugar</option>'
+      + '<optgroup label="Regiões">' + [...REGIOES, OUTRAS].map(r => `<option value="r:${esc(r)}">${esc(r)}</option>`).join("") + '</optgroup>'
+      + '<optgroup label="Estados">' + estados.map(e => `<option value="e:${esc(e)}">${esc(e)}</option>`).join("") + '</optgroup>';
+    opcoes($("#fPeriodo"), [["", "em qualquer data"], ["7", "nos últimos 7 dias"], ["15", "nos últimos 15 dias"], ["30", "nos últimos 30 dias"]]);
+    opcoes($("#fFonte"), [["", "qualquer fonte"], ...[...new Set(dados.map(v => v.fonte))].sort().map(f => [f, f])]);
+    lerHash();
+    render();
+    requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove("carregando")));
+  }
+
+  /* ---------- eventos ---------- */
+  const mudar = (dim, valor) => {
+    state[dim] = valor;
+    if (valor && dim === "regiao") state.estado = "";
+    if (valor && dim === "estado") state.regiao = "";
+    limite = POR_PAGINA; render();
+  };
+  [["#fArea","area"],["#fNivel","nivel"],["#fModelo","modelo"],["#fPeriodo","periodo"],["#fFonte","fonte"]]
+    .forEach(([id, dim]) => $(id).addEventListener("change", e => mudar(dim, e.target.value)));
+  $("#fRegiao").addEventListener("change", e => {
+    const v = e.target.value;
+    state.regiao = v.startsWith("r:") ? v.slice(2) : "";
+    state.estado = v.startsWith("e:") ? v.slice(2) : "";
+    limite = POR_PAGINA; render();
+  });
+  $("#fBusca").addEventListener("input", e => mudar("q", e.target.value.trim()));
+  document.addEventListener("click", e => {
+    const b = e.target.closest(".barra");
+    if (b) mudar(b.dataset.dim, state[b.dataset.dim] === b.dataset.key ? "" : b.dataset.key);
+  });
+  $("#chipEmpresa").addEventListener("click", () => mudar("empresa", ""));
+  $("#limpar").addEventListener("click", () => { CHAVES.forEach(k => state[k] = ""); limite = POR_PAGINA; render(); });
+  $("#mais").addEventListener("click", () => { limite += POR_PAGINA; render(); });
+
+  fetch("data/vagas.json", {cache: "no-store"})
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(iniciar)
+    .catch(() => {
+      $("#conteudo").hidden = true; $("#frase").hidden = true; document.querySelector(".extras").hidden = true;
+      const a = $("#aviso"); a.hidden = false;
+      a.innerHTML = "<p><b>Não consegui carregar os dados.</b></p><p>Abra o site pelo endereço do GitHub Pages (começa com https) e confira se o arquivo docs/data/vagas.json existe no repositório.</p>";
+      document.body.classList.remove("carregando");
+    });
+})();
+</script>
+</body>
+</html>
