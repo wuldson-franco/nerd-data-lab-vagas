@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nerd Data Lab | Radar de vagas de dados</title>
 <meta name="description" content="Vagas de dados coletadas automaticamente: filtre por nível, modelo de trabalho, região e área.">
+<link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&display=swap" rel="stylesheet">
@@ -36,7 +37,16 @@ a{color:inherit}
   background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
   background-size:28px 28px;
   -webkit-mask-image:linear-gradient(#000 40%,transparent);mask-image:linear-gradient(#000 40%,transparent)}
-.marca-linha{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
+.marca-linha{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px}
+.marca-linha .logo{grid-column:1}
+.marca-linha .selo{grid-column:2}
+.marca-linha .atual{grid-column:3;text-align:right}
+.selo{display:block;height:80px;width:auto;max-width:320px;object-fit:contain}
+@media (max-width:640px){
+  .marca-linha{grid-template-columns:1fr auto;grid-template-areas:"nome selo" "atual atual";row-gap:6px}
+  .marca-linha .logo{grid-area:nome}.marca-linha .selo{grid-area:selo;height:56px}
+  .marca-linha .atual{grid-area:atual;text-align:left}
+}
 .logo{font-weight:800;font-size:1.05rem;letter-spacing:-.01em}
 .atual{color:var(--ink2);font-size:.88rem}
 .frase{margin:34px 0 0;font-weight:500;font-size:clamp(1.55rem,3.6vw,2.7rem);line-height:1.5;letter-spacing:-.015em;max-width:30ch}
@@ -137,6 +147,7 @@ a{color:inherit}
   <div class="miolo">
     <div class="marca-linha">
       <span class="logo">Nerd Data Lab</span>
+      <img class="selo" src="logo.png" alt="Logo do Nerd Data Lab" onerror="this.hidden=true">
       <span class="atual" id="atual"></span>
     </div>
 
