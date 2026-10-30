@@ -171,6 +171,7 @@ a{color:inherit}
 </header>
 
 <main class="miolo">
+  <div class="aviso" id="avisoFontes" role="status" hidden></div>
   <div class="aviso" id="aviso" hidden></div>
 
   <div id="conteudo">
@@ -192,7 +193,7 @@ a{color:inherit}
     <button type="button" class="botao mais" id="mais" hidden>Mostrar mais vagas</button>
   </div>
 
-  <p class="rodape">Os dados são coletados automaticamente do Gupy e do Remotive e mantidos por 60 dias. Algumas vagas podem já ter sido encerradas: confirme no link antes de se candidatar. Aqui entram vagas de todo o Brasil: use os filtros para escolher modelo, região ou estado. A lista enviada na comunidade traz as remotas e as presenciais ou híbridas de João Pessoa, Campina Grande, Recife, Natal e regiões.</p>
+  <p class="rodape">Os dados são coletados automaticamente do Gupy, da Adzuna e do Remotive e mantidos por 60 dias. Algumas vagas podem já ter sido encerradas: confirme no link antes de se candidatar. Aqui entram vagas de todo o Brasil: use os filtros para escolher modelo, região ou estado. A lista enviada na comunidade traz as remotas e as presenciais ou híbridas de João Pessoa, Campina Grande, Recife, Natal e regiões.</p>
 </main>
 
 <script>
@@ -202,7 +203,7 @@ a{color:inherit}
   const NIVEIS = [["Júnior","jr"],["Pleno","pl"],["Sênior","sr"],["Estágio","es"],["Nível não informado","nd"]];
   const ROTULO_NIVEL = {"Nível não informado":"Sem nível"};
   const MODELOS = [["remote","Remoto"],["hybrid","Híbrido"],["on-site","Presencial"]];
-  const REGIOES = ["João Pessoa e região","Campina Grande e região","Recife e região","Natal e região"];
+  let REGIOES = ["João Pessoa e região","Campina Grande e região","Recife e região","Natal e região"];  // o robô envia a lista atual em vagas.json
   const OUTRAS = "Outras regiões";
   const CHAVES = ["q","area","nivel","modelo","regiao","estado","fonte","empresa","periodo"];
   const state = {q:"",area:"",nivel:"",modelo:"",regiao:"",estado:"",fonte:"",empresa:"",periodo:""};
@@ -378,11 +379,26 @@ a{color:inherit}
     if (state.regiao && state.estado) state.estado = "";
   }
 
+  /* ---------- aviso quando uma fonte não respondeu na última execução ---------- */
+  function avisarFontes(fontes) {
+    const el = $("#avisoFontes");
+    const falhas = Object.entries(fontes || {}).filter(([, f]) => f && (f.estado === "falhou" || f.estado === "parcial"));
+    if (!falhas.length) { el.hidden = true; return; }
+    el.innerHTML = falhas.map(([nome, f]) => nome === "Manual"
+      ? "<p>O arquivo de vagas manuais tem um erro de formato e foi ignorado na última atualização.</p>"
+      : f.estado === "falhou"
+        ? `<p><b>${esc(nome)}</b> não respondeu na última atualização. As vagas dessa fonte podem estar desatualizadas.</p>`
+        : `<p><b>${esc(nome)}</b> respondeu só em parte na última atualização. Algumas vagas dessa fonte podem estar faltando.</p>`).join("");
+    el.hidden = false;
+  }
+
   /* ---------- montagem ---------- */
   function opcoes(sel, lista) {
     sel.innerHTML = lista.map(([v, r]) => `<option value="${esc(v)}">${esc(r)}</option>`).join("");
   }
   function iniciar(json) {
+    if (Array.isArray(json.regioes) && json.regioes.length) REGIOES = json.regioes;
+    avisarFontes(json.fontes);
     dados = (json.vagas || []).map(v => ({...v, estado: v.modelo === "remote" ? "" : (v.estado || ""), _dia: diaDe(v.publicada), _busca: norm(v.titulo + " " + v.empresa + " " + (v.cidade || ""))}));
     if (json.atualizado_em) $("#atual").textContent = `Atualizado em ${fmt(json.atualizado_em.slice(0,10))} às ${json.atualizado_em.slice(11,16)}`;
     if (!dados.length) {

@@ -1,0 +1,16 @@
+{
+  "_ajuda": "Cole aqui vagas que você viu por aí. Na próxima execução do robô elas entram no site e no compilado do WhatsApp (uma vez só). Cada vaga fica entre chaves { } e as vagas são separadas por vírgula. Só 'titulo' e 'link' são obrigatórios. modelo: remoto, hibrido ou presencial (se não disser, vale remoto quando não há cidade). nivel (opcional): Júnior, Pleno, Sênior, Estágio. data: 2026-10-30 ou 30/10/2026 (se não disser, vale hoje). Depois de colar, confira o formato: um erro de vírgula faz o robô ignorar este arquivo e avisar no site.",
+
+  "_exemplo": {
+    "titulo": "Analista de Dados Pleno",
+    "empresa": "Nome da Empresa",
+    "link": "https://exemplo.com/vaga/123",
+    "modelo": "hibrido",
+    "cidade": "Recife",
+    "estado": "Pernambuco",
+    "nivel": "Pleno",
+    "data": "2026-10-30"
+  },
+
+  "vagas": []
+}

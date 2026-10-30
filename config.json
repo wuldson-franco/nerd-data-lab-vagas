@@ -1,0 +1,113 @@
+{
+  "_ajuda": "Edite este arquivo pelo GitHub (lápis, depois Commit). Acento nos termos não importa. Um * em um termo vale por 'qualquer final de palavra': estagi* acha estágio, estagiário e estagiária. Cuidado com vírgulas: todo item de uma lista, menos o último, termina com vírgula.",
+
+  "prazos_em_dias": {
+    "vaga_no_whatsapp": 10,
+    "coletar_para_o_site": 30,
+    "manter_no_site": 60,
+    "manter_txt": 7,
+    "manter_vistas": 45
+  },
+
+  "somente_remoto_no_whatsapp": false,
+
+  "buscas": [
+    "analista de dados",
+    "engenheiro de dados",
+    "cientista de dados",
+    "analista de BI",
+    "analytics engineer",
+    "data analyst",
+    "machine learning",
+    "estágio em dados",
+    "estágio BI",
+    "estagiário de dados",
+    "estágio data analytics"
+  ],
+
+  "filtros_de_titulo": {
+    "deve_conter": [
+      "dados", "data", "bi", "analytics", "machine learning", "business intelligence",
+      "inteligencia de negocio", "etl", "dbt", "power bi"
+    ],
+    "nao_pode_conter": [
+      "data entry", "digitador*", "trainee*", "data center", "jovem aprendiz", "aprendiz*"
+    ]
+  },
+
+  "niveis": {
+    "_ajuda": "Os nomes dos níveis são fixos (o site depende deles). Aqui você só muda os termos. A ordem importa: vale o primeiro que combinar.",
+    "Estágio": ["estagi*", "intern", "internship"],
+    "Júnior": ["junior", "jr"],
+    "Pleno": ["pleno", "pl"],
+    "Sênior": ["senior", "sr"]
+  },
+
+  "area_padrao": "Análise de dados",
+  "areas": {
+    "_ajuda": "A ordem importa: vale a primeira área que combinar. Se nenhuma combinar, usa area_padrao. Pode criar áreas novas à vontade.",
+    "Governança de dados": ["governanca*", "qualidade de dados", "data governance", "data quality"],
+    "Engenharia de dados": [
+      "engenheir* de dados", "data engineer*", "analytics engineer*", "banco de dados",
+      "dba", "etl", "dbt", "big data"
+    ],
+    "Ciência de dados e IA": [
+      "cientista*", "data scien*", "machine learning", "ml", "ia", "inteligencia artificial",
+      "nlp", "mlops", "ia generativa"
+    ],
+    "BI": ["bi", "business intelligence", "power bi", "dashboard*", "visualiza*"]
+  },
+
+  "regioes": {
+    "_ajuda": "Vagas presenciais ou híbridas só entram no WhatsApp se a cidade estiver numa destas regiões. Remotas entram sempre. Em exigem_estado ficam cidades de nome repetido pelo Brasil: elas só valem se a vaga disser o estado certo.",
+    "João Pessoa e região": {
+      "estado": "Paraíba",
+      "uf": "PB",
+      "cidades": ["João Pessoa", "Cabedelo", "Bayeux", "Santa Rita", "Conde", "Lucena", "Alhandra", "Caaporã", "Pitimbu", "Cruz do Espírito Santo", "Rio Tinto", "Mamanguape", "Sapé"],
+      "exigem_estado": ["Santa Rita", "Conde", "Lucena"]
+    },
+    "Campina Grande e região": {
+      "estado": "Paraíba",
+      "uf": "PB",
+      "cidades": ["Campina Grande", "Queimadas", "Lagoa Seca", "Puxinanã", "Massaranduba", "Pocinhos", "Esperança", "Alagoa Nova", "Boa Vista", "Fagundes", "Montadas", "Areial"],
+      "exigem_estado": ["Boa Vista", "Esperança", "Montadas", "Fagundes", "Areial"]
+    },
+    "Recife e região": {
+      "estado": "Pernambuco",
+      "uf": "PE",
+      "cidades": ["Recife", "Olinda", "Jaboatão dos Guararapes", "Paulista", "Camaragibe", "São Lourenço da Mata", "Cabo de Santo Agostinho", "Ipojuca", "Abreu e Lima", "Igarassu", "Itamaracá", "Itapissuma", "Moreno", "Araçoiaba"],
+      "exigem_estado": ["Paulista", "Moreno"]
+    },
+    "Natal e região": {
+      "estado": "Rio Grande do Norte",
+      "uf": "RN",
+      "cidades": ["Natal", "Parnamirim", "São Gonçalo do Amarante", "Macaíba", "Extremoz", "Ceará-Mirim", "Ceará Mirim", "Nísia Floresta", "São José de Mipibu", "Monte Alegre"],
+      "exigem_estado": ["Monte Alegre"]
+    }
+  },
+
+  "fontes": {
+    "_ajuda": "ativa: false desliga a fonte. O endereço (url) é o primeiro lugar para olhar quando uma fonte parar de funcionar. Cada fonte aceita também a chave 'buscas' para usar termos próprios em vez da lista geral.",
+    "gupy": {
+      "ativa": true,
+      "url": "https://portal.gupy.io/api/job-search/jobs",
+      "referer": "https://portal.gupy.io/job-search",
+      "tamanhos_de_pagina": [100, 50, 12],
+      "max_paginas_por_busca": 4
+    },
+    "adzuna": {
+      "ativa": true,
+      "url": "https://api.adzuna.com/v1/api/jobs/br/search/{pagina}",
+      "paginas_por_busca": 2,
+      "vagas_por_pagina": 50,
+      "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice"],
+      "palavras_hibrido": ["hibrido", "hibrida", "hybrid"]
+    },
+    "remotive": {
+      "ativa": true,
+      "url": "https://remotive.com/api/remote-jobs",
+      "categoria": "data",
+      "locais_aceitos": ["brazil", "brasil", "latam", "latin america", "south america", "americas", "worldwide", "anywhere"]
+    }
+  }
+}
