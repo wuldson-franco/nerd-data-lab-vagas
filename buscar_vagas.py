@@ -566,7 +566,9 @@ def buscar_jooble(agora, cfg):
                     cfg["url"].format(chave=chave),
                     json={"keywords": termo, "location": cfg.get("localizacao", "Brasil"),
                           "page": pagina, "ResultOnPage": por_pagina, "datecreatedfrom": desde},
-                    headers={**HEADERS, "Content-Type": "application/json"}, timeout=30)
+                    headers={**HEADERS, "Content-Type": "application/json",
+                             **({"User-Agent": cfg["user_agent"]} if cfg.get("user_agent") else {})},
+                    timeout=30)
             except Exception as e:
                 print(f"[aviso] Jooble '{termo}': {_sem_segredo(e, chave)}")
                 erros += 1
@@ -684,19 +686,27 @@ def buscar_google(agora, cfg):
                 if itens:
                     print(f"[debug] Google campos: {sorted(itens[0].keys())}; "
                           f"location: {itens[0].get('location')!r}; "
-                          f"extensões: {itens[0].get('detected_extensions')}")
+                          f"extensions: {itens[0].get('extensions')}; "
+                          f"detected: {itens[0].get('detected_extensions')}")
             for j in itens:
                 ext = j.get("detected_extensions") or {}
+                lista_ext = [str(x) for x in (j.get("extensions") or []) if x]
                 data = parse_relativo(ext.get("posted_at", ""), agora)
+                if data is None:                      # a data vem como texto solto na lista
+                    for item in lista_ext:
+                        data = parse_relativo(item, agora)
+                        if data:
+                            break
                 if data and not recente(data.isoformat(), agora):
                     continue
                 apply = [a.get("link") for a in (j.get("apply_options") or []) if a.get("link")]
                 link = apply[0] if apply else j.get("share_link", "")
-                titulo = _sem_html(j.get("title"))
+                titulo = _sem_html(j.get("title") or j.get("job_title"))
                 loc = j.get("location", "")
                 cidade, estado_nome = separar_local(loc)
                 modelo = ("remote" if ext.get("work_from_home") else
-                          _modelo_por_texto(f"{titulo} {loc}", re_remoto, re_hibrido))
+                          _modelo_por_texto(f"{titulo} {loc} {' '.join(lista_ext)}",
+                                            re_remoto, re_hibrido))
                 vagas.append({
                     "titulo": titulo,
                     "empresa": _sem_html(j.get("company_name")),

@@ -118,6 +118,7 @@
       "ativa": true,
       "url": "https://jooble.org/api/{chave}",
       "localizacao": "Brasil",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
       "buscas": ["analista de dados", "engenheiro de dados", "cientista de dados", "estágio em dados"],
       "paginas_por_busca": 1,
       "vagas_por_pagina": 50,
@@ -134,7 +135,7 @@
       "buscas": ["analista de dados", "engenheiro de dados", "cientista de dados", "analista de BI", "estágio em dados"],
       "paginas_por_busca": 2,
       "limite": {"tipo": "mensal", "maximo": 220},
-      "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice"],
+      "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice", "trabalho em casa", "work from home"],
       "palavras_hibrido": ["hibrido", "hibrida", "hybrid"]
     },
     "remotive": {
