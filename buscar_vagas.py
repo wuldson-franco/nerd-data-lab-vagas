@@ -31,6 +31,7 @@ CAMINHO_CONFIG = RAIZ / "config.json"
 ARQ_MANUAIS = RAIZ / "vagas_manuais.json"
 PASTA_VAGAS = RAIZ / "vagas"
 ARQ_VISTAS = RAIZ / "vistas.json"
+ARQ_USO = RAIZ / "uso_apis.json"                         # contador de chamadas das APIs com cota
 ARQ_HISTORICO = RAIZ / "docs" / "data" / "vagas.json"   # alimenta o site
 
 HEADERS = {"User-Agent": "NerdDataLab-JobBot/1.0 (projeto pessoal)"}
@@ -147,9 +148,14 @@ def iniciar_config(caminho=None):
                          [norm(c) for c in r["cidades"]],
                          {norm(c) for c in r.get("exigem_estado", [])})
 
-    for nome in ("gupy", "adzuna", "remotive"):
+    for nome in ("gupy", "adzuna", "jooble", "google", "remotive"):
         if nome not in cfg["fontes"] or "url" not in cfg["fontes"][nome]:
             raise ConfigInvalida(f"{caminho.name}: a fonte '{nome}' precisa de 'url'.")
+    for nome in ("jooble", "google"):
+        lim = cfg["fontes"][nome].get("limite") or {}
+        if lim.get("tipo") not in ("total", "mensal") or not isinstance(lim.get("maximo"), int):
+            raise ConfigInvalida(f"{caminho.name}: fontes.{nome}.limite precisa de "
+                                 f"\"tipo\" (total ou mensal) e \"maximo\" (número inteiro).")
 
     CFG = cfg
     REGIOES = regioes
@@ -432,6 +438,289 @@ def buscar_remotive(agora, cfg):
     return vagas
 
 
+# ----------------- APOIO PARA FONTES COM COTA (Jooble, Google) -----------------
+def _sem_segredo(txt, *segredos):
+    """Tira chaves de API de qualquer texto antes de imprimir (o log do Actions é público)."""
+    txt = str(txt)
+    for s in segredos:
+        if s:
+            txt = txt.replace(s, "***")
+    return txt
+
+
+def nome_estado(txt):
+    """'PE' -> 'Pernambuco'; 'pernambuco' -> 'Pernambuco'; senão ''."""
+    mapa = _sem_ajuda(CFG.get("estados", {}))
+    t = (txt or "").strip()
+    if t.upper() in mapa:
+        return mapa[t.upper()]
+    for nome in mapa.values():
+        if norm(nome) == norm(t):
+            return nome
+    return ""
+
+
+def separar_local(loc):
+    """'Recife, PE' / 'São Paulo - SP' / 'Recife, State of Pernambuco, Brazil' -> (cidade, estado)."""
+    partes = [p.strip() for p in re.split(r"[,\-/|]", loc or "") if p.strip()]
+    cidade = estado = ""
+    for i, p in enumerate(partes):
+        p_sem = re.sub(r"^(state of|estado de|estado do|estado da)\s+", "", norm(p)).strip()
+        com_prefixo = p_sem != norm(p)
+        e = nome_estado(p_sem if com_prefixo else p)
+        if i == 0 and len(partes) > 1 and not com_prefixo and len(p) > 2:
+            e = ""            # 1º pedaço é a cidade ('São Paulo - SP'), mesmo se o nome é de estado
+        if e and not estado:
+            estado = e
+        elif norm(p) in ("brasil", "brazil", "br", "anywhere", "qualquer lugar"):
+            continue
+        elif not cidade:
+            cidade = p
+    return cidade, estado
+
+
+_UNIDADES = {"minuto": 1 / 1440, "hora": 1 / 24, "dia": 1, "semana": 7, "mes": 30, "meses": 30}
+
+
+def parse_relativo(txt, agora):
+    """'há 3 dias', '3 days ago', 'ontem', '2 semanas atrás' -> datetime; None se não entender."""
+    t = norm(txt or "")
+    if not t:
+        return None
+    if re.search(r"\b(hoje|today|agora|just posted|recem)\b", t):
+        return agora
+    if re.search(r"\b(ontem|yesterday)\b", t):
+        return agora - timedelta(days=1)
+    m = re.search(r"(\d+)\+?\s*(minuto|min|hora|hour|hr|dia|day|semana|week|mes|meses|month)", t)
+    if not m:
+        return None
+    n, un = int(m.group(1)), m.group(2)
+    un = {"min": "minuto", "hour": "hora", "hr": "hora", "day": "dia",
+          "week": "semana", "month": "mes"}.get(un, un)
+    return agora - timedelta(days=n * _UNIDADES[un])
+
+
+class Cota:
+    """Conta chamadas de API em uso_apis.json para nunca estourar o plano gratuito."""
+    def __init__(self, fonte, cfg, agora, arquivo=None):
+        self.fonte, self.agora = fonte, agora
+        self.arquivo = Path(arquivo or ARQ_USO)
+        lim = cfg.get("limite") or {}
+        self.tipo = lim.get("tipo", "mensal")
+        self.maximo = int(lim.get("maximo", 0))
+        self.periodo = "total" if self.tipo == "total" else f"{agora:%Y-%m}"
+
+    def _ler(self):
+        try:
+            return json.loads(self.arquivo.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def usado(self):
+        return int(self._ler().get(self.fonte, {}).get(self.periodo, 0))
+
+    def pode(self):
+        return self.usado() < self.maximo
+
+    def gastar(self):
+        """Registra a chamada ANTES de fazê-la (conservador) e grava na hora."""
+        dados = self._ler()
+        d = dados.setdefault(self.fonte, {})
+        if self.tipo != "total":                       # guarda só o mês corrente
+            d = dados[self.fonte] = {k: v for k, v in d.items() if k == self.periodo}
+        d[self.periodo] = int(d.get(self.periodo, 0)) + 1
+        self.arquivo.write_text(json.dumps(dados, indent=1, ensure_ascii=False), encoding="utf-8")
+
+    def resumo(self):
+        return f"{self.usado()}/{self.maximo} ({'no total' if self.tipo == 'total' else 'neste mês'})"
+
+
+def _modelo_por_texto(texto, re_remoto, re_hibrido):
+    t = norm(texto)
+    return "remote" if re_remoto.search(t) else "hybrid" if re_hibrido.search(t) else "on-site"
+
+
+def buscar_jooble(agora, cfg):
+    chave = os.environ.get("JOOBLE_API_KEY", "").strip()
+    if not chave:
+        print("[info] Jooble pulada: falta o Secret JOOBLE_API_KEY.")
+        STATUS["Jooble"] = {"estado": "pulada", "vagas": 0, "erros": 0}
+        return []
+    cota = Cota("jooble", cfg, agora)
+    re_remoto = regex_de_termos(cfg.get("palavras_remoto", []))
+    re_hibrido = regex_de_termos(cfg.get("palavras_hibrido", []))
+    por_pagina = cfg.get("vagas_por_pagina", 50)
+    desde = f"{agora - timedelta(days=DIAS_COLETA_SITE):%Y-%m-%d}"
+    vagas, erros, primeira, parar = [], 0, True, False
+    print(f"[info] Jooble: cota usada {cota.resumo()}")
+    for termo in cfg.get("buscas", CFG["buscas"]):
+        for pagina in range(1, cfg.get("paginas_por_busca", 1) + 1):
+            if not cota.pode():
+                print(f"[aviso] Jooble: cota de {cota.maximo} chamadas atingida; fonte pausada "
+                      f"para preservar a chave. Aumente 'limite.maximo' no config.json se quiser.")
+                parar = True
+                break
+            cota.gastar()
+            try:
+                r = requests.post(
+                    cfg["url"].format(chave=chave),
+                    json={"keywords": termo, "location": cfg.get("localizacao", "Brasil"),
+                          "page": pagina, "ResultOnPage": por_pagina, "datecreatedfrom": desde},
+                    headers={**HEADERS, "Content-Type": "application/json"}, timeout=30)
+            except Exception as e:
+                print(f"[aviso] Jooble '{termo}': {_sem_segredo(e, chave)}")
+                erros += 1
+                parar = True          # falha de rede/endereço: não gasta o resto da cota
+                break
+            if r.status_code != 200:
+                print(f"[aviso] Jooble '{termo}': HTTP {r.status_code} - "
+                      f"{_sem_segredo(r.text[:200], chave)!r}. Fonte interrompida.")
+                erros += 1
+                parar = True          # 1ª resposta ruim: não insiste (cada chamada é contada)
+                break
+            try:
+                corpo = r.json()
+            except ValueError:
+                print(f"[aviso] Jooble '{termo}': resposta não é JSON. Fonte interrompida.")
+                erros += 1
+                parar = True
+                break
+            itens = corpo.get("jobs", []) if isinstance(corpo, dict) else []
+            if primeira:
+                primeira = False
+                print(f"[debug] Jooble OK; chaves: {list(corpo.keys()) if isinstance(corpo, dict) else type(corpo)}; "
+                      f"totalCount: {corpo.get('totalCount') if isinstance(corpo, dict) else '?'}")
+                if itens:
+                    print(f"[debug] Jooble campos: {sorted(itens[0].keys())}; "
+                          f"location: {itens[0].get('location')!r}; updated: {itens[0].get('updated')!r}")
+            for j in itens:
+                atualizada = j.get("updated", "")
+                if not recente(atualizada, agora):
+                    continue
+                cidade, estado_nome = separar_local(j.get("location", ""))
+                titulo = _sem_html(j.get("title"))
+                modelo = _modelo_por_texto(f"{titulo} {_sem_html(j.get('snippet'))} {j.get('type', '')}",
+                                           re_remoto, re_hibrido)
+                vagas.append({
+                    "titulo": titulo,
+                    "empresa": _sem_html(j.get("company")),
+                    "url": j.get("link", ""),
+                    "modelo": modelo,
+                    "cidade": cidade,
+                    "texto_local": norm(f"{cidade} {j.get('location', '')}").strip(),
+                    "estado": norm(estado_nome),
+                    "estado_nome": estado_nome,
+                    "fonte": "Jooble",
+                    "publicada": atualizada,
+                })
+            if len(itens) < por_pagina:
+                break
+            time.sleep(1)
+        if parar:
+            break
+        time.sleep(1)
+    print(f"[info] Jooble: {len(vagas)} vagas recentes coletadas; cota agora {cota.resumo()}")
+    registrar("Jooble", vagas, erros)
+    return vagas
+
+
+def buscar_google(agora, cfg):
+    chave = os.environ.get("SERPAPI_KEY", "").strip()
+    if not chave:
+        print("[info] Google pulada: falta o Secret SERPAPI_KEY.")
+        STATUS["Google"] = {"estado": "pulada", "vagas": 0, "erros": 0}
+        return []
+    cota = Cota("google", cfg, agora)
+    re_remoto = regex_de_termos(cfg.get("palavras_remoto", []))
+    re_hibrido = regex_de_termos(cfg.get("palavras_hibrido", []))
+    vagas, erros, primeira, parar = [], 0, True, False
+    print(f"[info] Google: cota usada {cota.resumo()}")
+    for termo in cfg.get("buscas", CFG["buscas"]):
+        token = None
+        for pagina in range(1, cfg.get("paginas_por_busca", 2) + 1):
+            if not cota.pode():
+                print(f"[aviso] Google: cota de {cota.maximo} buscas neste mês atingida; "
+                      f"fonte pausada até o mês que vem.")
+                parar = True
+                break
+            params = {"engine": "google_jobs", "q": termo, "gl": cfg.get("pais", "br"),
+                      "hl": cfg.get("idioma", "pt-br"), "api_key": chave}
+            if token:
+                params["next_page_token"] = token
+            cota.gastar()
+            try:
+                r = requests.get(cfg["url"], params=params, headers=HEADERS, timeout=60)
+            except Exception as e:
+                print(f"[aviso] Google '{termo}': {_sem_segredo(e, chave)}")
+                erros += 1
+                parar = True
+                break
+            if r.status_code != 200:
+                print(f"[aviso] Google '{termo}': HTTP {r.status_code} - "
+                      f"{_sem_segredo(r.text[:200], chave)!r}. Fonte interrompida.")
+                erros += 1
+                parar = True
+                break
+            try:
+                corpo = r.json()
+            except ValueError:
+                print(f"[aviso] Google '{termo}': resposta não é JSON. Fonte interrompida.")
+                erros += 1
+                parar = True
+                break
+            if not isinstance(corpo, dict):
+                corpo = {}
+            if corpo.get("error"):
+                msg = _sem_segredo(corpo["error"], chave)
+                if "hasn't returned any results" in msg or "no results" in msg.lower():
+                    break             # busca sem resultados: normal
+                print(f"[aviso] Google '{termo}': {msg}")
+                erros += 1
+                break
+            itens = corpo.get("jobs_results", []) or []
+            if primeira:
+                primeira = False
+                print(f"[debug] Google OK; chaves: {list(corpo.keys())}")
+                if itens:
+                    print(f"[debug] Google campos: {sorted(itens[0].keys())}; "
+                          f"location: {itens[0].get('location')!r}; "
+                          f"extensões: {itens[0].get('detected_extensions')}")
+            for j in itens:
+                ext = j.get("detected_extensions") or {}
+                data = parse_relativo(ext.get("posted_at", ""), agora)
+                if data and not recente(data.isoformat(), agora):
+                    continue
+                apply = [a.get("link") for a in (j.get("apply_options") or []) if a.get("link")]
+                link = apply[0] if apply else j.get("share_link", "")
+                titulo = _sem_html(j.get("title"))
+                loc = j.get("location", "")
+                cidade, estado_nome = separar_local(loc)
+                modelo = ("remote" if ext.get("work_from_home") else
+                          _modelo_por_texto(f"{titulo} {loc}", re_remoto, re_hibrido))
+                vagas.append({
+                    "titulo": titulo,
+                    "empresa": _sem_html(j.get("company_name")),
+                    "url": link,
+                    "modelo": modelo,
+                    "cidade": cidade,
+                    "texto_local": norm(f"{cidade} {loc}").strip(),
+                    "estado": norm(estado_nome),
+                    "estado_nome": estado_nome,
+                    "fonte": "Google",
+                    "publicada": data.isoformat() if data else "",
+                    "data_incerta": data is None,   # sem data confiável: só no site
+                })
+            token = (corpo.get("serpapi_pagination") or {}).get("next_page_token")
+            if not token or not itens:
+                break
+            time.sleep(1)
+        if parar:
+            break
+    print(f"[info] Google: {len(vagas)} vagas coletadas; cota agora {cota.resumo()}")
+    registrar("Google", vagas, erros)
+    return vagas
+
+
 # --------------------------- VAGAS MANUAIS ------------------------------
 def _data_manual(txt, agora):
     txt = str(txt or "").strip()
@@ -598,6 +887,8 @@ def montar_texto(vagas, agora) -> str:
 
 FONTES = (("Gupy", "gupy", buscar_gupy),
           ("Adzuna", "adzuna", buscar_adzuna),
+          ("Jooble", "jooble", buscar_jooble),
+          ("Google", "google", buscar_google),
           ("Remotive", "remotive", buscar_remotive))
 
 
@@ -659,6 +950,8 @@ def main():
             vai_pro_whats = False
         if not manual and not recente(v.get("publicada"), agora, DIAS_VAGA_RECENTE):
             vai_pro_whats = False   # vaga mais antiga: só no site
+        if v.get("data_incerta"):
+            vai_pro_whats = False   # sem data confiável (Google): só no site
 
         todas.append(v)                                   # site: tudo
         if vai_pro_whats and v["url"] not in vistas:      # WhatsApp: filtrado e sem repetir

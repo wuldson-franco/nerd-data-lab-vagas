@@ -86,6 +86,16 @@
     }
   },
 
+  "estados": {
+    "_ajuda": "Siglas e nomes dos estados. Algumas fontes (Jooble, Google) devolvem 'Recife, PE'; aqui a sigla vira o nome completo para o filtro do site agrupar certo.",
+    "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia", "CE": "Ceará",
+    "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás", "MA": "Maranhão",
+    "MT": "Mato Grosso", "MS": "Mato Grosso do Sul", "MG": "Minas Gerais", "PA": "Pará",
+    "PB": "Paraíba", "PR": "Paraná", "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro",
+    "RN": "Rio Grande do Norte", "RS": "Rio Grande do Sul", "RO": "Rondônia", "RR": "Roraima",
+    "SC": "Santa Catarina", "SP": "São Paulo", "SE": "Sergipe", "TO": "Tocantins"
+  },
+
   "fontes": {
     "_ajuda": "ativa: false desliga a fonte. O endereço (url) é o primeiro lugar para olhar quando uma fonte parar de funcionar. Cada fonte aceita também a chave 'buscas' para usar termos próprios em vez da lista geral.",
     "gupy": {
@@ -96,10 +106,34 @@
       "max_paginas_por_busca": 4
     },
     "adzuna": {
-      "ativa": true,
+      "ativa": false,
       "url": "https://api.adzuna.com/v1/api/jobs/br/search/{pagina}",
       "paginas_por_busca": 2,
       "vagas_por_pagina": 50,
+      "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice"],
+      "palavras_hibrido": ["hibrido", "hibrida", "hybrid"]
+    },
+    "jooble": {
+      "_ajuda": "Chave gratuita = 500 chamadas NO TOTAL (não por mês). O script conta as chamadas em uso_apis.json e para em 'limite.maximo', deixando folga. Cada busca x página = 1 chamada. Chave no Secret JOOBLE_API_KEY.",
+      "ativa": true,
+      "url": "https://jooble.org/api/{chave}",
+      "localizacao": "Brasil",
+      "buscas": ["analista de dados", "engenheiro de dados", "cientista de dados", "estágio em dados"],
+      "paginas_por_busca": 1,
+      "vagas_por_pagina": 50,
+      "limite": {"tipo": "total", "maximo": 450},
+      "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice"],
+      "palavras_hibrido": ["hibrido", "hibrida", "hybrid"]
+    },
+    "google": {
+      "_ajuda": "Google Jobs via SerpAPI. Plano gratuito = 250 buscas por mês (cada busca x página conta 1). Chave no Secret SERPAPI_KEY. O Google não filtra por data: vagas sem data confiável ficam só no site, não vão para o WhatsApp.",
+      "ativa": true,
+      "url": "https://serpapi.com/search.json",
+      "pais": "br",
+      "idioma": "pt-br",
+      "buscas": ["analista de dados", "engenheiro de dados", "cientista de dados", "analista de BI", "estágio em dados"],
+      "paginas_por_busca": 2,
+      "limite": {"tipo": "mensal", "maximo": 220},
       "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice"],
       "palavras_hibrido": ["hibrido", "hibrida", "hybrid"]
     },
