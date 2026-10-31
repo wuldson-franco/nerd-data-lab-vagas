@@ -115,7 +115,7 @@
     },
     "jooble": {
       "_ajuda": "Chave gratuita = 500 chamadas NO TOTAL (não por mês). O script conta as chamadas em uso_apis.json e para em 'limite.maximo', deixando folga. Cada busca x página = 1 chamada. Chave no Secret JOOBLE_API_KEY.",
-      "ativa": true,
+      "ativa": false,
       "url": "https://jooble.org/api/{chave}",
       "localizacao": "Brasil",
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
