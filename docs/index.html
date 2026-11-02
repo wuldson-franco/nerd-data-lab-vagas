@@ -460,5 +460,22 @@ a{color:inherit}
     });
 })();
 </script>
+<script>
+/* Quando a página está dentro do site WordPress (iframe), avisa a altura para o iframe se ajustar. */
+(function () {
+  if (window.parent === window) return;
+  var ultima = 0;
+  function avisar() {
+    var h = Math.ceil(document.documentElement.getBoundingClientRect().height);
+    if (Math.abs(h - ultima) < 2) return;
+    ultima = h;
+    try { window.parent.postMessage({tipo: "nerd-altura", altura: h}, "*"); } catch (e) {}
+  }
+  if ("ResizeObserver" in window) new ResizeObserver(avisar).observe(document.documentElement);
+  window.addEventListener("load", avisar);
+  window.addEventListener("resize", avisar);
+  setTimeout(avisar, 500);
+})();
+</script>
 </body>
 </html>
