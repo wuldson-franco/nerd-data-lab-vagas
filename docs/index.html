@@ -53,6 +53,7 @@ a{color:inherit}
   .marca-linha .atual{grid-area:atual;text-align:left}
 }
 .logo{font-weight:800;font-size:1.05rem;letter-spacing:-.01em}
+.logo .sub{font-weight:400;opacity:.75}
 .atual{color:var(--ink2);font-size:.88rem}
 .frase{margin:34px 0 0;font-weight:500;font-size:clamp(1.55rem,3.6vw,2.7rem);line-height:1.5;letter-spacing:-.015em;max-width:30ch}
 @media (min-width:900px){.frase{max-width:34ch}}
@@ -151,7 +152,7 @@ a{color:inherit}
 <header class="topo">
   <div class="miolo">
     <div class="marca-linha">
-      <span class="logo">Nerd Data Lab</span>
+      <span class="logo">Nerd Data Vagas <span class="sub">- seu radar de vagas do Nerd Data Lab</span></span>
       <img class="selo" src="logo.png" alt="Logo do Nerd Data Lab" onerror="this.hidden=true">
       <span class="atual" id="atual"></span>
     </div>
