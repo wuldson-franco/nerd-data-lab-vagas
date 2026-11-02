@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
+<script>try{if(window.parent!==window)document.documentElement.classList.add("embutido")}catch(e){document.documentElement.classList.add("embutido")}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nerd Data Lab | Radar de vagas de dados</title>
@@ -42,6 +43,10 @@ a{color:inherit}
 .marca-linha .selo{grid-column:2}
 .marca-linha .atual{grid-column:3;text-align:right}
 .selo{display:block;height:80px;width:auto;max-width:320px;object-fit:contain}
+/* dentro do site WordPress: o menu do site cobre o topo, então desce o conteúdo e tira o logo do meio */
+.embutido .selo{display:none}
+.embutido .topo{padding-top:104px}
+@media (max-width:640px){.embutido .topo{padding-top:92px}}
 @media (max-width:640px){
   .marca-linha{grid-template-columns:1fr auto;grid-template-areas:"nome selo" "atual atual";row-gap:6px}
   .marca-linha .logo{grid-area:nome}.marca-linha .selo{grid-area:selo;height:56px}
