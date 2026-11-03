@@ -151,6 +151,13 @@ def iniciar_config(caminho=None):
     for nome in ("gupy", "adzuna", "jooble", "google", "remotive"):
         if nome not in cfg["fontes"] or "url" not in cfg["fontes"][nome]:
             raise ConfigInvalida(f"{caminho.name}: a fonte '{nome}' precisa de 'url'.")
+    emp = cfg["fontes"].get("empresas")
+    if not isinstance(emp, dict) or not isinstance(emp.get("lista"), list):
+        raise ConfigInvalida(f"{caminho.name}: a fonte 'empresas' precisa de uma 'lista'.")
+    for i, e in enumerate(emp["lista"], 1):
+        if not isinstance(e, dict) or not str(e.get("url", "")).startswith(("http://", "https://")):
+            raise ConfigInvalida(f"{caminho.name}: empresas.lista, item {i}: faltou o 'url' "
+                                 f"(precisa começar com https://).")
     for nome in ("jooble", "google"):
         lim = cfg["fontes"][nome].get("limite") or {}
         if lim.get("tipo") not in ("total", "mensal") or not isinstance(lim.get("maximo"), int):
@@ -731,6 +738,255 @@ def buscar_google(agora, cfg):
     return vagas
 
 
+# --------------- CARREIRAS DE EMPRESAS (lista monitorada no config.json) ---------------
+def _detectar_sistema(url):
+    """Descobre o sistema de recrutamento pelo endereço: (tipo, identificador)."""
+    from urllib.parse import urlparse
+    u = urlparse(url.strip())
+    host = (u.hostname or "").lower()
+    partes = [p for p in u.path.split("/") if p]
+    if host in ("jobs.lever.co", "jobs.eu.lever.co") and partes:
+        return "lever", partes[0]
+    if host in ("boards.greenhouse.io", "job-boards.greenhouse.io", "job-boards.eu.greenhouse.io") and partes:
+        return "greenhouse", partes[0]
+    if host == "jobs.ashbyhq.com" and partes:
+        return "ashby", partes[0]
+    if host == "apply.workable.com" and partes:
+        return "workable", partes[0]
+    if host.endswith(".recruitee.com"):
+        return "recruitee", host.split(".")[0]
+    return "pagina", url.strip()
+
+
+def _ms_para_iso(ms):
+    try:
+        return datetime.fromtimestamp(int(ms) / 1000, TZ).isoformat()
+    except (TypeError, ValueError, OSError):
+        return ""
+
+
+def _vaga_de_empresa(nome, titulo, url, local, modelo, data):
+    cidade, estado_nome = separar_local(local)
+    return {
+        "titulo": _sem_html(titulo), "empresa": nome, "url": url or "", "modelo": modelo,
+        "cidade": cidade, "texto_local": norm(f"{cidade} {local}").strip(),
+        "estado": norm(estado_nome), "estado_nome": estado_nome,
+        "fonte": "Carreiras", "publicada": data or "", "data_incerta": not data,
+    }
+
+
+def _jsonld_vagas(html):
+    """Acha blocos JSON-LD do tipo JobPosting dentro do HTML de uma página."""
+    achados = []
+
+    def visitar(no):
+        if isinstance(no, list):
+            for x in no:
+                visitar(x)
+        elif isinstance(no, dict):
+            tipo = no.get("@type")
+            tipos = tipo if isinstance(tipo, list) else [tipo]
+            if "JobPosting" in tipos:
+                achados.append(no)
+            for k in ("@graph", "itemListElement", "item", "mainEntity"):
+                if k in no:
+                    visitar(no[k])
+    for m in re.finditer(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+                         html or "", re.S | re.I):
+        try:
+            visitar(json.loads(m.group(1).strip()))
+        except ValueError:
+            continue
+    return achados
+
+
+def _empresa_lever(nome, slug, agora, re_remoto, re_hibrido):
+    r = requests.get(f"https://api.lever.co/v0/postings/{slug}", params={"mode": "json"},
+                     headers=HEADERS, timeout=30)
+    r.raise_for_status()
+    itens = r.json()
+    if not isinstance(itens, list):
+        raise ValueError("resposta do Lever não é uma lista")
+    vagas = []
+    for j in itens:
+        cat = j.get("categories") or {}
+        loc = cat.get("location", "") or ""
+        wp = norm(j.get("workplaceType", ""))
+        modelo = ("remote" if wp == "remote" else "hybrid" if wp == "hybrid" else
+                  _modelo_por_texto(f"{j.get('text', '')} {loc}", re_remoto, re_hibrido))
+        vagas.append(_vaga_de_empresa(nome, j.get("text"), j.get("hostedUrl"), loc, modelo,
+                                      _ms_para_iso(j.get("createdAt"))))
+    return vagas, itens
+
+
+def _empresa_greenhouse(nome, slug, agora, re_remoto, re_hibrido):
+    r = requests.get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs",
+                     headers=HEADERS, timeout=30)
+    r.raise_for_status()
+    itens = (r.json() or {}).get("jobs", [])
+    vagas = []
+    for j in itens:
+        loc = (j.get("location") or {}).get("name", "") or ""
+        data = j.get("first_published") or j.get("updated_at") or ""
+        vagas.append(_vaga_de_empresa(nome, j.get("title"), j.get("absolute_url"), loc,
+                                      _modelo_por_texto(f"{j.get('title', '')} {loc}", re_remoto, re_hibrido),
+                                      data))
+    return vagas, itens
+
+
+def _empresa_ashby(nome, slug, agora, re_remoto, re_hibrido):
+    r = requests.get(f"https://api.ashbyhq.com/posting-api/job-board/{slug}",
+                     headers=HEADERS, timeout=30)
+    r.raise_for_status()
+    itens = (r.json() or {}).get("jobs", [])
+    vagas = []
+    for j in itens:
+        loc = j.get("location", "") or ""
+        modelo = ("remote" if j.get("isRemote") else
+                  _modelo_por_texto(f"{j.get('title', '')} {loc}", re_remoto, re_hibrido))
+        vagas.append(_vaga_de_empresa(nome, j.get("title"), j.get("jobUrl"), loc, modelo,
+                                      j.get("publishedAt") or ""))
+    return vagas, itens
+
+
+def _empresa_workable(nome, slug, agora, re_remoto, re_hibrido):
+    r = requests.post(f"https://apply.workable.com/api/v3/accounts/{slug}/jobs",
+                      json={"query": "", "location": [], "department": [], "worktype": [], "remote": []},
+                      headers={**HEADERS, "Content-Type": "application/json"}, timeout=30)
+    r.raise_for_status()
+    itens = (r.json() or {}).get("results", [])
+    vagas = []
+    for j in itens:
+        l = j.get("location") or {}
+        loc = ", ".join(x for x in (l.get("city"), l.get("region"), l.get("country")) if x)
+        modelo = ("remote" if j.get("workplace") == "remote" or j.get("remote") else
+                  "hybrid" if j.get("workplace") == "hybrid" else
+                  _modelo_por_texto(f"{j.get('title', '')} {loc}", re_remoto, re_hibrido))
+        vagas.append(_vaga_de_empresa(nome, j.get("title"),
+                                      f"https://apply.workable.com/{slug}/j/{j.get('shortcode')}/",
+                                      loc, modelo, j.get("published") or ""))
+    return vagas, itens
+
+
+def _empresa_recruitee(nome, slug, agora, re_remoto, re_hibrido):
+    r = requests.get(f"https://{slug}.recruitee.com/api/offers/", headers=HEADERS, timeout=30)
+    r.raise_for_status()
+    itens = (r.json() or {}).get("offers", [])
+    vagas = []
+    for j in itens:
+        loc = ", ".join(x for x in (j.get("city"), j.get("country")) if x)
+        modelo = "remote" if j.get("remote") else _modelo_por_texto(
+            f"{j.get('title', '')} {loc}", re_remoto, re_hibrido)
+        vagas.append(_vaga_de_empresa(nome, j.get("title"), j.get("careers_url"), loc, modelo,
+                                      j.get("created_at") or ""))
+    return vagas, itens
+
+
+_MESES = {"janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4, "maio": 5, "junho": 6, "julho": 7,
+          "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12}
+
+
+def _data_publicada(html):
+    """Acha 'Publicada em 03 de Novembro de 2026' no texto de uma página de vaga."""
+    m = re.search(r"publicad[ao]\s+em\s+(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})", norm(_sem_html(html)))
+    if not m or m.group(2) not in _MESES:
+        return ""
+    try:
+        return f"{int(m.group(3)):04d}-{_MESES[m.group(2)]:02d}-{int(m.group(1)):02d}"
+    except ValueError:
+        return ""
+
+
+def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=15):
+    """Página-lista sem código padrão: pega os links cujo texto parece vaga de dados e abre cada
+    um só para ler a data de publicação. O modelo (remoto etc.) NÃO é deduzido do texto da página,
+    porque benefícios como 'auxílio home office' enganariam; só vale o que está no título."""
+    from urllib.parse import urljoin
+    candidatos, vistos = [], set()
+    for m in re.finditer(r'<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', html or "", re.S | re.I):
+        href = urljoin(url, m.group(1).strip())
+        texto = re.sub(r"\s+", " ", _sem_html(m.group(2))).strip()
+        if (not href.startswith(("http://", "https://")) or href in vistos or not texto
+                or len(texto) > 120 or not e_vaga_de_dados(texto)):
+            continue
+        vistos.add(href)
+        candidatos.append((texto, href))
+    vagas = []
+    for texto, href in candidatos[:max_paginas]:
+        data = ""
+        try:
+            r = requests.get(href, headers={**HEADERS, "Accept": "text/html"}, timeout=30)
+            if r.status_code == 200:
+                data = _data_publicada(r.text)
+        except Exception:
+            pass
+        vagas.append(_vaga_de_empresa(nome, texto, href, "",
+                                      _modelo_por_texto(texto, re_remoto, re_hibrido), data))
+        time.sleep(1)
+    return vagas, candidatos
+
+
+def _empresa_pagina(nome, url, agora, re_remoto, re_hibrido):
+    r = requests.get(url, headers={**HEADERS, "Accept": "text/html"}, timeout=30)
+    r.raise_for_status()
+    itens = _jsonld_vagas(r.text)
+    if not itens:
+        return _vagas_por_links(nome, url, r.text, agora, re_remoto, re_hibrido)
+    vagas = []
+    for j in itens:
+        end = ""
+        loc_raw = j.get("jobLocation")
+        loc_raw = loc_raw[0] if isinstance(loc_raw, list) and loc_raw else loc_raw
+        if isinstance(loc_raw, dict):
+            a = loc_raw.get("address") or {}
+            if isinstance(a, dict):
+                end = ", ".join(x for x in (a.get("addressLocality"), a.get("addressRegion")) if x)
+        remoto = "TELECOMMUTE" in str(j.get("jobLocationType", "")).upper()
+        modelo = "remote" if remoto else _modelo_por_texto(
+            f"{j.get('title', '')} {end}", re_remoto, re_hibrido)
+        org = j.get("hiringOrganization")
+        vagas.append(_vaga_de_empresa(nome, j.get("title"), j.get("url") or url, end, modelo,
+                                      j.get("datePosted") or ""))
+    return vagas, itens
+
+
+_LEITORES = {"lever": _empresa_lever, "greenhouse": _empresa_greenhouse, "ashby": _empresa_ashby,
+             "workable": _empresa_workable, "recruitee": _empresa_recruitee, "pagina": _empresa_pagina}
+
+
+def buscar_empresas(agora, cfg):
+    """Lê a página de vagas de cada empresa da lista do config.json."""
+    lista = [e for e in cfg.get("lista", []) if isinstance(e, dict) and e.get("url")]
+    re_remoto = regex_de_termos(cfg.get("palavras_remoto", []))
+    re_hibrido = regex_de_termos(cfg.get("palavras_hibrido", []))
+    vagas, erros = [], 0
+    for e in lista:
+        nome = e.get("nome") or e["url"]
+        tipo, ident = _detectar_sistema(e["url"])
+        try:
+            achadas, brutas = _LEITORES[tipo](nome, ident if tipo != "pagina" else e["url"],
+                                              agora, re_remoto, re_hibrido)
+        except Exception as ex:
+            print(f"[aviso] Carreiras - {nome} ({tipo}): {ex}")
+            erros += 1
+            continue
+        recentes = [v for v in achadas if v["url"].startswith(("http://", "https://"))
+                    and recente(v["publicada"], agora)]
+        de_dados = [v for v in recentes if e_vaga_de_dados(v["titulo"])]
+        print(f"[debug] Carreiras - {nome} ({tipo}): {len(brutas)} vagas na página, "
+              f"{len(recentes)} recentes, {len(de_dados)} de dados")
+        if tipo == "pagina" and not brutas:
+            print(f"[aviso] Carreiras - {nome}: não achei vagas de dados nem o código padrão de vaga "
+                  f"(JobPosting) na página; ela provavelmente carrega as vagas por JavaScript. Veja se "
+                  f"a empresa usa Greenhouse, Lever, Ashby, Workable ou Recruitee e troque o endereço.")
+            erros += 1
+        vagas += recentes
+        time.sleep(1)
+    print(f"[info] Carreiras: {len(vagas)} vagas recentes de {len(lista)} empresas")
+    registrar("Carreiras", vagas, erros)
+    return vagas
+
+
 # --------------------------- VAGAS MANUAIS ------------------------------
 def _data_manual(txt, agora):
     txt = str(txt or "").strip()
@@ -899,7 +1155,8 @@ FONTES = (("Gupy", "gupy", buscar_gupy),
           ("Adzuna", "adzuna", buscar_adzuna),
           ("Jooble", "jooble", buscar_jooble),
           ("Google", "google", buscar_google),
-          ("Remotive", "remotive", buscar_remotive))
+          ("Remotive", "remotive", buscar_remotive),
+          ("Carreiras", "empresas", buscar_empresas))
 
 
 def main():

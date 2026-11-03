@@ -138,6 +138,20 @@
       "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice", "trabalho em casa", "work from home"],
       "palavras_hibrido": ["hibrido", "hibrida", "hybrid"]
     },
+    "empresas": {
+      "_ajuda": "Lista de empresas que você quer acompanhar. Cole o endereço da PÁGINA DE VAGAS (a que lista todas). O robô reconhece o sistema pelo endereço: Lever (jobs.lever.co/...), Greenhouse (job-boards.greenhouse.io/...), Ashby, Workable e Recruitee usam a API aberta deles; qualquer outro endereço é lido procurando o código padrão de vaga da página (pode não funcionar se a página carrega as vagas por JavaScript; o log do Actions avisa). Só entram vagas de dados (filtros_de_titulo). Cada item termina com vírgula, menos o último.",
+      "ativa": true,
+      "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice"],
+      "palavras_hibrido": ["hibrido", "hibrida", "hybrid"],
+      "lista": [
+        {"nome": "Seedz", "url": "https://tech.seedz.ag/vagas_seedz"},
+        {"nome": "Nubank", "url": "https://jobs.ashbyhq.com/nubank"},
+        {"nome": "Neon", "url": "https://jobs.lever.co/neon"},
+        {"nome": "Zup", "url": "https://job-boards.greenhouse.io/zupinnovation"},
+        {"nome": "Mercado Livre", "url": "https://careers-meli.mercadolibre.com/pt"},
+        {"nome": "CWI", "url": "https://cwi.com.br/talentos/oportunidades/"}
+      ]
+    },
     "remotive": {
       "ativa": true,
       "url": "https://remotive.com/api/remote-jobs",

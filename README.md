@@ -13,6 +13,7 @@ com filtros (GitHub Pages) e um texto pronto para o WhatsApp.
 | Incluir uma cidade na minha região | `config.json` → `regioes` | Acrescente à lista `cidades` |
 | Mudar quantos dias de vaga entram | `config.json` → `prazos_em_dias` | Troque o número |
 | Ajustar como o nível ou a área é detectado | `config.json` → `niveis` / `areas` | Edite os termos |
+| Acompanhar as vagas de uma empresa | `config.json` → `fontes` → `empresas` → `lista` | Acrescente `{"nome": "Empresa", "url": "endereço da página de vagas"}` |
 | Incluir uma vaga que vi por aí | `vagas_manuais.json` | Copie o `_exemplo` para dentro de `vagas` |
 | Mudar os dias da semana do robô | `.github/workflows/vagas.yml` | Linha `cron` |
 
@@ -52,6 +53,14 @@ de um ano e o Google fica bem abaixo dos 250 por mês.
 
 As vagas do Google não trazem data confiável: quando não dá para saber, elas aparecem
 só no site e não entram no texto do WhatsApp.
+
+## Empresas monitoradas
+
+A lista em `config.json` → `fontes` → `empresas` faz o robô visitar a página de vagas de cada
+empresa. Lever, Greenhouse, Ashby, Workable e Recruitee são lidos pela API aberta deles; outras
+páginas, pelo código padrão de vaga (JobPosting), quando existe. Só entram vagas de dados.
+No log do Actions, cada empresa mostra quantas vagas tinha e quantas eram de dados; se uma
+página não puder ser lida, o log diz e o site mostra o aviso amarelo.
 
 ## O que continua no código
 
