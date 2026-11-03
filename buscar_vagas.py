@@ -291,6 +291,9 @@ def buscar_gupy(agora, cfg):
             for j in itens:
                 if not recente(j.get("publishedDate"), agora):
                     continue
+                prazo = parse_data(_pegar(j, "applicationDeadline"))
+                if prazo and prazo < agora:
+                    continue                      # candidaturas já encerradas
                 modelo = (j.get("workplaceType") or "").lower()
                 if j.get("isRemoteWork"):
                     modelo = "remote"
@@ -1097,6 +1100,73 @@ def buscar_empresas(agora, cfg):
     return vagas
 
 
+# ------------------------- VAGAS ENCERRADAS ------------------------------
+_RE_ENCERRADA = re.compile(
+    r"(vaga|candidaturas?|inscricoes?|processo seletivo|posicao|oportunidade)\s+(esta\s+|foi\s+|ja\s+)?"
+    r"(encerrad|fechad|finalizad|preenchid|expirad)"
+    r"|nao\s+(esta|estao)\s+mais\s+(disponivel|disponiveis|aceitando|recebendo)"
+    r"|(candidaturas?|inscricoes?)\s+(foram\s+)?(encerradas?|fechadas?)"
+    r"|no longer (accepting|available|open)|position (has been|is) (filled|closed)"
+    r"|(job|posting|vacancy) (is |has )?(closed|expired|been filled|no longer)"
+    r"|this job (has )?(expired|closed)")
+
+
+def vaga_encerrada(url, timeout=20):
+    """(encerrada?, motivo). Na dúvida (erro de rede, página estranha) devolve False e a vaga fica."""
+    try:
+        r = requests.get(url, headers={**HEADERS, "Accept": "text/html"}, timeout=timeout,
+                         allow_redirects=True)
+        if r.status_code in (404, 410):
+            return True, f"HTTP {r.status_code}"
+        if r.status_code != 200:
+            return False, ""
+        texto = re.sub(r"(?is)<(script|style).*?</\1>", " ", r.text[:400000])
+        m = _RE_ENCERRADA.search(norm(_sem_html(texto)))
+        return (True, f"página diz: {m.group(0)[:50]!r}") if m else (False, "")
+    except Exception:
+        return False, ""
+
+
+def _ler_historico():
+    try:
+        return json.loads(ARQ_HISTORICO.read_text(encoding="utf-8")).get("vagas", [])
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def verificar_encerradas(novas, agora, hoje_urls):
+    """Confere links e devolve (urls_encerradas, conferidas{url: data}).
+    1) todas as vagas candidatas ao WhatsApp; 2) uma parte do histórico que não apareceu hoje."""
+    cfg = CFG.get("verificar_encerradas", {})
+    if not cfg.get("ativa", True):
+        return set(), {}
+    max_novas = int(cfg.get("max_novas_por_execucao", 80))
+    max_hist = int(cfg.get("max_historico_por_execucao", 60))
+    pausa = float(cfg.get("pausa_em_segundos", 0.5))
+    encerradas, conferidas, feitas = set(), {}, 0
+    hoje = f"{agora:%Y-%m-%d}"
+
+    def conferir(url, rotulo):
+        nonlocal feitas
+        feitas += 1
+        fechada, motivo = vaga_encerrada(url)
+        conferidas[url] = hoje
+        if fechada:
+            encerradas.add(url)
+            print(f"[info] encerrada ({rotulo}, {motivo}): {url[:90]}")
+        time.sleep(pausa)
+
+    for v in novas[:max_novas]:
+        conferir(v["url"], "nova")
+    antigas = [v for v in _ler_historico()
+               if v.get("url") and v["url"] not in hoje_urls and v["url"] not in conferidas]
+    antigas.sort(key=lambda v: v.get("conferida_em") or "")     # quem foi conferida há mais tempo primeiro
+    for v in antigas[:max_hist]:
+        conferir(v["url"], "histórico")
+    print(f"[info] links conferidos: {feitas}; encerrados: {len(encerradas)}")
+    return encerradas, conferidas
+
+
 # --------------------------- VAGAS MANUAIS ------------------------------
 def _data_manual(txt, agora):
     txt = str(txt or "").strip()
@@ -1189,13 +1259,14 @@ def limpar_txt_antigos(agora):
             print(f"[limpeza] removido {arq.name}")
 
 
-def atualizar_historico(todas, agora):
+def atualizar_historico(todas, agora, removidas=(), conferidas=None):
     """Guarda as vagas (sem repetir por link) em docs/data/vagas.json para o site."""
     try:
         atual = json.loads(ARQ_HISTORICO.read_text(encoding="utf-8")).get("vagas", [])
     except (FileNotFoundError, json.JSONDecodeError):
         atual = []
-    por_url = {v["url"]: v for v in atual if v.get("url")}
+    por_url = {v["url"]: v for v in atual if v.get("url") and v["url"] not in set(removidas)}
+    conferidas = conferidas or {}
     hoje = f"{agora:%Y-%m-%d}"
     for v in todas:
         d = parse_data(v.get("publicada"))
@@ -1213,7 +1284,11 @@ def atualizar_historico(todas, agora):
             "fonte": v["fonte"],
             "publicada": f"{d:%Y-%m-%d}" if d else registro.get("publicada", hoje),
             "visto_em": hoje,
+            "conferida_em": conferidas.get(v["url"]) or registro.get("conferida_em", ""),
         }
+    for url, data in conferidas.items():                  # vagas antigas só conferidas hoje
+        if url in por_url and not por_url[url].get("conferida_em", "") >= data:
+            por_url[url]["conferida_em"] = data
     limite = f"{(agora - timedelta(days=DIAS_HISTORICO)):%Y-%m-%d}"
     vagas = [v for v in por_url.values() if v["visto_em"] >= limite]
     vagas.sort(key=lambda v: (v["publicada"], v["titulo"]), reverse=True)
@@ -1334,7 +1409,11 @@ def main():
         if vai_pro_whats and v["url"] not in vistas:      # WhatsApp: filtrado e sem repetir
             novas.append(v)
 
-    atualizar_historico(todas, agora)
+    encerradas, conferidas = verificar_encerradas(novas, agora, {v["url"] for v in todas})
+    if encerradas:
+        novas = [v for v in novas if v["url"] not in encerradas]
+        todas = [v for v in todas if v["url"] not in encerradas]
+    atualizar_historico(todas, agora, encerradas, conferidas)
     print(f"[info] fora do .txt do WhatsApp (continuam no site): {fora_da_regiao} fora das "
           f"regiões, {sem_local} sem informação de local")
     if not novas:

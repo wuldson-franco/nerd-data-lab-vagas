@@ -11,6 +11,14 @@
 
   "somente_remoto_no_whatsapp": false,
 
+  "verificar_encerradas": {
+    "_ajuda": "Antes de ir para o WhatsApp, o robô abre o link de cada vaga nova e descarta se estiver encerrada (HTTP 404/410 ou a página dizendo que a vaga fechou). Também confere, a cada execução, uma parte das vagas do site que não apareceram hoje e remove as encerradas. Na dúvida (erro de rede), a vaga fica. ativa: false desliga.",
+    "ativa": true,
+    "max_novas_por_execucao": 80,
+    "max_historico_por_execucao": 60,
+    "pausa_em_segundos": 0.5
+  },
+
   "buscas": [
     "analista de dados",
     "engenheiro de dados",

@@ -62,6 +62,14 @@ páginas, pelo código padrão de vaga (JobPosting), quando existe. Só entram v
 No log do Actions, cada empresa mostra quantas vagas tinha e quantas eram de dados; se uma
 página não puder ser lida, o log diz e o site mostra o aviso amarelo.
 
+## Vagas encerradas
+
+Antes de entrar no texto do WhatsApp, o robô abre o link de cada vaga nova e descarta se estiver
+encerrada (página não encontrada ou texto como "candidaturas encerradas"). Na Gupy, vagas com prazo
+vencido nem entram. A cada execução ele também confere uma parte das vagas do site que não
+apareceram hoje e remove as encerradas. Se der erro de rede, a vaga fica. Ajustes em
+`config.json` → `verificar_encerradas` (`"ativa": false` desliga).
+
 ## O que continua no código
 
 A leitura da resposta de cada fonte (qual campo é o título, qual é a cidade) está em
