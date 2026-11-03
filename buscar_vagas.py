@@ -682,11 +682,16 @@ def buscar_google(agora, cfg):
             if corpo.get("error"):
                 msg = _sem_segredo(corpo["error"], chave)
                 if "hasn't returned any results" in msg or "no results" in msg.lower():
+                    print(f"[debug] Google '{termo}' pág {pagina}: sem resultados ({msg[:120]})")
                     break             # busca sem resultados: normal
                 print(f"[aviso] Google '{termo}': {msg}")
                 erros += 1
                 break
             itens = corpo.get("jobs_results", []) or []
+            if not itens and not corpo.get("error"):
+                meta = corpo.get("search_metadata") or {}
+                print(f"[debug] Google '{termo}' pág {pagina}: resposta sem jobs_results; "
+                      f"chaves: {list(corpo.keys())}; status: {meta.get('status')}")
             if primeira:
                 primeira = False
                 print(f"[debug] Google OK; chaves: {list(corpo.keys())}")
@@ -897,7 +902,50 @@ def _data_publicada(html):
         return ""
 
 
-def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=15):
+class _Navegador:
+    """Navegador sem janela (Playwright) para páginas que montam a lista por JavaScript.
+    Só abre quando alguma empresa tem "javascript": true no config.json."""
+    def __init__(self):
+        self._pw = self._browser = self._ctx = None
+
+    def _abrir(self):
+        if self._ctx:
+            return
+        from playwright.sync_api import sync_playwright      # só importa se for usar
+        self._pw = sync_playwright().start()
+        self._browser = self._pw.chromium.launch()
+        self._ctx = self._browser.new_context(locale="pt-BR", user_agent=HEADERS["User-Agent"])
+
+    def html(self, url, espera_ms=1500):
+        self._abrir()
+        pagina = self._ctx.new_page()
+        try:
+            pagina.goto(url, wait_until="networkidle", timeout=45000)
+            pagina.wait_for_timeout(espera_ms)
+            return pagina.content()
+        finally:
+            pagina.close()
+
+    def fechar(self):
+        try:
+            if self._browser:
+                self._browser.close()
+            if self._pw:
+                self._pw.stop()
+        except Exception:
+            pass
+        self._pw = self._browser = self._ctx = None
+
+
+def _obter_html(url, nav=None):
+    if nav is not None:
+        return nav.html(url)
+    r = requests.get(url, headers={**HEADERS, "Accept": "text/html"}, timeout=30)
+    r.raise_for_status()
+    return r.text
+
+
+def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=15, nav=None):
     """Página-lista sem código padrão: pega os links cujo texto parece vaga de dados e abre cada
     um só para ler a data de publicação. O modelo (remoto etc.) NÃO é deduzido do texto da página,
     porque benefícios como 'auxílio home office' enganariam; só vale o que está no título."""
@@ -911,13 +959,20 @@ def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=
             continue
         vistos.add(href)
         candidatos.append((texto, href))
+    todos = re.findall(r"<a\s", html or "", re.I)
+    print(f"[debug] Carreiras - {nome}: página com {len(html or '')} caracteres, {len(todos)} links, "
+          f"{len(candidatos)} parecem vaga de dados; ld+json: {'sim' if 'ld+json' in (html or '') else 'não'}")
+    if not candidatos:
+        amostra = [re.sub(r"\s+", " ", _sem_html(m.group(2))).strip()[:50]
+                   for m in re.finditer(r'<a\s[^>]*>(.*?)</a>', html or "", re.S | re.I)][:6]
+        print(f"[debug] Carreiras - {nome}: primeiros textos de link: {amostra}")
     vagas = []
     for texto, href in candidatos[:max_paginas]:
         data = ""
         try:
-            r = requests.get(href, headers={**HEADERS, "Accept": "text/html"}, timeout=30)
-            if r.status_code == 200:
-                data = _data_publicada(r.text)
+            data = _data_publicada(_obter_html(href))
+            if not data and nav is not None:        # a data pode ser montada por JavaScript
+                data = _data_publicada(_obter_html(href, nav))
         except Exception:
             pass
         vagas.append(_vaga_de_empresa(nome, texto, href, "",
@@ -926,12 +981,11 @@ def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=
     return vagas, candidatos
 
 
-def _empresa_pagina(nome, url, agora, re_remoto, re_hibrido):
-    r = requests.get(url, headers={**HEADERS, "Accept": "text/html"}, timeout=30)
-    r.raise_for_status()
-    itens = _jsonld_vagas(r.text)
+def _empresa_pagina(nome, url, agora, re_remoto, re_hibrido, nav=None):
+    html = _obter_html(url, nav)
+    itens = _jsonld_vagas(html)
     if not itens:
-        return _vagas_por_links(nome, url, r.text, agora, re_remoto, re_hibrido)
+        return _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, nav=nav)
     vagas = []
     for j in itens:
         end = ""
@@ -960,12 +1014,21 @@ def buscar_empresas(agora, cfg):
     re_remoto = regex_de_termos(cfg.get("palavras_remoto", []))
     re_hibrido = regex_de_termos(cfg.get("palavras_hibrido", []))
     vagas, erros = [], 0
+    nav = _Navegador() if any(e.get("javascript") for e in lista) else None
     for e in lista:
         nome = e.get("nome") or e["url"]
         tipo, ident = _detectar_sistema(e["url"])
         try:
-            achadas, brutas = _LEITORES[tipo](nome, ident if tipo != "pagina" else e["url"],
-                                              agora, re_remoto, re_hibrido)
+            if tipo == "pagina":
+                achadas, brutas = _empresa_pagina(nome, e["url"], agora, re_remoto, re_hibrido,
+                                                  nav=nav if e.get("javascript") else None)
+            else:
+                achadas, brutas = _LEITORES[tipo](nome, ident, agora, re_remoto, re_hibrido)
+        except ImportError:
+            print(f"[aviso] Carreiras - {nome}: falta o Playwright (pip install playwright e "
+                  f"playwright install chromium). Empresa pulada.")
+            erros += 1
+            continue
         except Exception as ex:
             print(f"[aviso] Carreiras - {nome} ({tipo}): {ex}")
             erros += 1
@@ -979,9 +1042,10 @@ def buscar_empresas(agora, cfg):
             print(f"[aviso] Carreiras - {nome}: não achei vagas de dados nem o código padrão de vaga "
                   f"(JobPosting) na página; ela provavelmente carrega as vagas por JavaScript. Veja se "
                   f"a empresa usa Greenhouse, Lever, Ashby, Workable ou Recruitee e troque o endereço.")
-            erros += 1
         vagas += recentes
         time.sleep(1)
+    if nav is not None:
+        nav.fechar()
     print(f"[info] Carreiras: {len(vagas)} vagas recentes de {len(lista)} empresas")
     registrar("Carreiras", vagas, erros)
     return vagas
