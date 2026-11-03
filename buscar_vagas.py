@@ -538,6 +538,14 @@ class Cota:
         d[self.periodo] = int(d.get(self.periodo, 0)) + 1
         self.arquivo.write_text(json.dumps(dados, indent=1, ensure_ascii=False), encoding="utf-8")
 
+    def devolver(self):
+        """Busca sem resultado não é cobrada pelo SerpAPI: tira do contador."""
+        dados = self._ler()
+        d = dados.get(self.fonte, {})
+        if d.get(self.periodo, 0) > 0:
+            d[self.periodo] -= 1
+            self.arquivo.write_text(json.dumps(dados, indent=1, ensure_ascii=False), encoding="utf-8")
+
     def resumo(self):
         return f"{self.usado()}/{self.maximo} ({'no total' if self.tipo == 'total' else 'neste mês'})"
 
@@ -654,6 +662,8 @@ def buscar_google(agora, cfg):
                 break
             params = {"engine": "google_jobs", "q": termo, "gl": cfg.get("pais", "br"),
                       "hl": cfg.get("idioma", "pt-br"), "api_key": chave}
+            if cfg.get("localizacao"):
+                params["location"] = cfg["localizacao"]
             if token:
                 params["next_page_token"] = token
             cota.gastar()
@@ -683,6 +693,7 @@ def buscar_google(agora, cfg):
                 msg = _sem_segredo(corpo["error"], chave)
                 if "hasn't returned any results" in msg or "no results" in msg.lower():
                     print(f"[debug] Google '{termo}' pág {pagina}: sem resultados ({msg[:120]})")
+                    cota.devolver()
                     break             # busca sem resultados: normal
                 print(f"[aviso] Google '{termo}': {msg}")
                 erros += 1
@@ -963,8 +974,8 @@ def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=
     print(f"[debug] Carreiras - {nome}: página com {len(html or '')} caracteres, {len(todos)} links, "
           f"{len(candidatos)} parecem vaga de dados; ld+json: {'sim' if 'ld+json' in (html or '') else 'não'}")
     if not candidatos:
-        amostra = [re.sub(r"\s+", " ", _sem_html(m.group(2))).strip()[:50]
-                   for m in re.finditer(r'<a\s[^>]*>(.*?)</a>', html or "", re.S | re.I)][:6]
+        amostra = [re.sub(r"\s+", " ", _sem_html(m.group(1))).strip()[:50]
+                   for m in re.finditer(r'<a\s[^>]*>(.*?)</a>', html or "", re.S | re.I)][:12]
         print(f"[debug] Carreiras - {nome}: primeiros textos de link: {amostra}")
     vagas = []
     for texto, href in candidatos[:max_paginas]:
