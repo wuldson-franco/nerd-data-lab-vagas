@@ -913,6 +913,23 @@ def _data_publicada(html):
         return ""
 
 
+def _titulo_da_pagina(html):
+    """Título da vaga numa página: og:title, depois <h1>, depois <title> (sem o ' | Empresa')."""
+    for padrao in (r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']',
+                   r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:title["\']',
+                   r"<h1[^>]*>(.*?)</h1>", r"<title[^>]*>(.*?)</title>"):
+        m = re.search(padrao, html or "", re.S | re.I)
+        if m:
+            t = re.sub(r"\s+", " ", _sem_html(m.group(1))).strip()
+            t = re.split(r"\s+[|·]\s+", t)[0].strip()
+            if t:
+                return t[:120]
+    return ""
+
+
+_RE_CTA = re.compile(r"^(confira|ver|veja|saiba|candidat|aplic|inscrev|acesse|clique|leia|conheca|apply|view|see)\b")
+
+
 class _Navegador:
     """Navegador sem janela (Playwright) para páginas que montam a lista por JavaScript.
     Só abre quando alguma empresa tem "javascript": true no config.json."""
@@ -961,18 +978,36 @@ def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=
     um só para ler a data de publicação. O modelo (remoto etc.) NÃO é deduzido do texto da página,
     porque benefícios como 'auxílio home office' enganariam; só vale o que está no título."""
     from urllib.parse import urljoin
-    candidatos, vistos = [], set()
+    candidatos, genericos, vistos = [], [], set()
     for m in re.finditer(r'<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', html or "", re.S | re.I):
-        href = urljoin(url, m.group(1).strip())
+        href = urljoin(url, m.group(1).strip()).split("#")[0]
         texto = re.sub(r"\s+", " ", _sem_html(m.group(2))).strip()
         if (not href.startswith(("http://", "https://")) or href in vistos or not texto
-                or len(texto) > 120 or not e_vaga_de_dados(texto)):
+                or len(texto) > 120 or href.rstrip("/") == url.rstrip("/")):
             continue
-        vistos.add(href)
-        candidatos.append((texto, href))
+        if e_vaga_de_dados(texto):
+            vistos.add(href)
+            candidatos.append((texto, href))
+        elif _RE_CTA.match(norm(texto)) and len(texto) <= 40:     # "Confira a vaga": título fica fora do link
+            vistos.add(href)
+            genericos.append(href)
+    for href in genericos[:25]:                                    # abre a página e lê o título dela
+        try:
+            try:
+                pag = _obter_html(href)
+                titulo = _titulo_da_pagina(pag)
+                if not titulo and nav is not None:
+                    titulo = _titulo_da_pagina(_obter_html(href, nav))
+            except Exception:
+                titulo = ""
+        except Exception:
+            titulo = ""
+        if titulo and e_vaga_de_dados(titulo):
+            candidatos.append((titulo, href))
+        time.sleep(1)
     todos = re.findall(r"<a\s", html or "", re.I)
     print(f"[debug] Carreiras - {nome}: página com {len(html or '')} caracteres, {len(todos)} links, "
-          f"{len(candidatos)} parecem vaga de dados; ld+json: {'sim' if 'ld+json' in (html or '') else 'não'}")
+          f"{len(candidatos)} parecem vaga de dados ({len(genericos)} links genéricos abertos); ld+json: {'sim' if 'ld+json' in (html or '') else 'não'}")
     if not candidatos:
         amostra = [re.sub(r"\s+", " ", _sem_html(m.group(1))).strip()[:50]
                    for m in re.finditer(r'<a\s[^>]*>(.*?)</a>', html or "", re.S | re.I)][:12]

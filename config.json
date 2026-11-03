@@ -136,7 +136,7 @@
       "buscas": ["analista de dados", "engenheiro de dados", "cientista de dados", "analista de BI", "estágio em dados"],
       "paginas_por_busca": 2,
       "limite": {"tipo": "mensal", "maximo": 220},
-      "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice", "trabalho em casa", "work from home"],
+      "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice", "trabalho em casa", "trabalho de casa", "work from home", "qualquer lugar", "anywhere"],
       "palavras_hibrido": ["hibrido", "hibrida", "hybrid"]
     },
     "empresas": {
