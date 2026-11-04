@@ -70,6 +70,16 @@ vencido nem entram. A cada execução ele também confere uma parte das vagas do
 apareceram hoje e remove as encerradas. Se der erro de rede, a vaga fica. Ajustes em
 `config.json` → `verificar_encerradas` (`"ativa": false` desliga).
 
+## Histórico completo (banco de dados)
+
+`dados/vagas_historico.csv` guarda **todas** as vagas já vistas e nunca apaga linhas. Colunas:
+`id`, `titulo`, `empresa`, `url`, `nivel`, `area`, `modelo`, `cidade`, `estado`, `regiao`, `fonte`,
+`publicada`, `primeira_vez_visto`, `ultima_vez_visto`, `status` e, quando encerrada,
+`encerrada_em` e `motivo_encerrada`. O `status` é `aberta` (vista na última execução),
+`nao_vista` (sumiu das fontes) ou `encerrada` (confirmada pela verificação dos links).
+No Excel, abra com Dados → De Texto/CSV (codificação UTF-8). No Power BI, Obter dados → Texto/CSV.
+Na primeira execução ele já nasce com as vagas que o site tinha (a data da primeira vez dessas é aproximada).
+
 ## O que continua no código
 
 A leitura da resposta de cada fonte (qual campo é o título, qual é a cidade) está em

@@ -14,6 +14,8 @@ O QUE ESTE SCRIPT FAZ
      (de qualquer lugar) e presenciais/híbridas das regiões do config.json.
   5. vistas.json evita repetir no WhatsApp uma vaga já enviada.
 """
+import csv
+import hashlib
 import json
 import os
 import re
@@ -31,6 +33,7 @@ CAMINHO_CONFIG = RAIZ / "config.json"
 ARQ_MANUAIS = RAIZ / "vagas_manuais.json"
 PASTA_VAGAS = RAIZ / "vagas"
 ARQ_VISTAS = RAIZ / "vistas.json"
+ARQ_BANCO = RAIZ / "dados" / "vagas_historico.csv"       # histórico completo, só cresce
 ARQ_USO = RAIZ / "uso_apis.json"                         # contador de chamadas das APIs com cota
 ARQ_HISTORICO = RAIZ / "docs" / "data" / "vagas.json"   # alimenta o site
 
@@ -47,6 +50,7 @@ AREAS_RE = []         # [(nome, regex)]
 AREA_PADRAO = ""
 DIAS_MANTER_TXT = DIAS_MANTER_VISTAS = DIAS_HISTORICO = DIAS_COLETA_SITE = DIAS_VAGA_RECENTE = 0
 SOMENTE_REMOTO = False
+MOTIVOS_ENCERRADA = {}   # url -> motivo (preenchido pela verificação)
 STATUS = {}           # fonte -> {"estado": ok|parcial|falhou|pulada|desativada, "vagas": n, "erros": n}
 
 
@@ -1153,6 +1157,7 @@ def verificar_encerradas(novas, agora, hoje_urls):
         conferidas[url] = hoje
         if fechada:
             encerradas.add(url)
+            MOTIVOS_ENCERRADA[url] = motivo
             print(f"[info] encerrada ({rotulo}, {motivo}): {url[:90]}")
         time.sleep(pausa)
 
@@ -1165,6 +1170,77 @@ def verificar_encerradas(novas, agora, hoje_urls):
         conferir(v["url"], "histórico")
     print(f"[info] links conferidos: {feitas}; encerrados: {len(encerradas)}")
     return encerradas, conferidas
+
+
+# ----------------------- HISTÓRICO COMPLETO (CSV) ------------------------
+COLUNAS_BANCO = ["id", "titulo", "empresa", "url", "nivel", "area", "modelo", "cidade", "estado",
+                 "regiao", "fonte", "publicada", "primeira_vez_visto", "ultima_vez_visto",
+                 "status", "encerrada_em", "motivo_encerrada"]
+
+
+def _id_da_vaga(url):
+    return hashlib.sha1(url.strip().encode("utf-8")).hexdigest()[:12]
+
+
+def _linha_de_vaga(v, hoje, existente=None):
+    """Linha do CSV para uma vaga vista hoje (preserva a data da primeira vez)."""
+    d = parse_data(v.get("publicada"))
+    antiga = existente or {}
+    return {
+        "id": _id_da_vaga(v["url"]), "titulo": v["titulo"], "empresa": v.get("empresa", ""),
+        "url": v["url"], "nivel": v.get("nivel", ""), "area": v.get("area", ""),
+        "modelo": v["modelo"] if v.get("modelo") in ("remote", "hybrid") else "on-site",
+        "cidade": v.get("cidade", ""), "estado": v.get("estado_nome", ""),
+        "regiao": v.get("regiao", ""), "fonte": v.get("fonte", ""),
+        "publicada": f"{d:%Y-%m-%d}" if d else antiga.get("publicada", ""),
+        "primeira_vez_visto": antiga.get("primeira_vez_visto") or hoje,
+        "ultima_vez_visto": hoje, "status": "aberta", "encerrada_em": "", "motivo_encerrada": "",
+    }
+
+
+def atualizar_banco(todas, encerradas, agora, caminho=None):
+    """Acrescenta/atualiza o CSV histórico. Nunca apaga linhas.
+    status: aberta (vista hoje), nao_vista (sumiu das fontes), encerrada (confirmada pela verificação)."""
+    caminho = Path(caminho or ARQ_BANCO)
+    hoje = f"{agora:%Y-%m-%d}"
+    linhas = {}
+    if caminho.exists():
+        with caminho.open(encoding="utf-8-sig", newline="") as f:
+            for r in csv.DictReader(f):
+                if r.get("id"):
+                    linhas[r["id"]] = r
+    else:                       # primeira vez: aproveita o que o site já tinha (data da 1ª vez é aproximada)
+        for v in _ler_historico():
+            if v.get("url"):
+                i = _id_da_vaga(v["url"])
+                linhas[i] = {"id": i, "titulo": v.get("titulo", ""), "empresa": v.get("empresa", ""),
+                             "url": v["url"], "nivel": v.get("nivel", ""), "area": v.get("area", ""),
+                             "modelo": v.get("modelo", ""), "cidade": v.get("cidade", ""),
+                             "estado": v.get("estado", ""), "regiao": v.get("regiao", ""),
+                             "fonte": v.get("fonte", ""), "publicada": v.get("publicada", ""),
+                             "primeira_vez_visto": v.get("visto_em", hoje), "ultima_vez_visto": v.get("visto_em", hoje),
+                             "status": "nao_vista", "encerrada_em": "", "motivo_encerrada": ""}
+    vistas_hoje = set()
+    for v in todas:
+        i = _id_da_vaga(v["url"])
+        vistas_hoje.add(i)
+        linhas[i] = _linha_de_vaga(v, hoje, linhas.get(i))
+    for url in encerradas:
+        i = _id_da_vaga(url)
+        if i in linhas:
+            linhas[i].update(status="encerrada", motivo_encerrada=MOTIVOS_ENCERRADA.get(url, ""))
+            linhas[i]["encerrada_em"] = linhas[i].get("encerrada_em") or hoje
+    for i, r in linhas.items():
+        if i not in vistas_hoje and r.get("status") != "encerrada":
+            r["status"] = "nao_vista"
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    with caminho.open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=COLUNAS_BANCO, extrasaction="ignore")
+        w.writeheader()
+        for r in sorted(linhas.values(), key=lambda r: (r.get("primeira_vez_visto", ""), r["id"])):
+            w.writerow({c: r.get(c, "") for c in COLUNAS_BANCO})
+    abertas = sum(1 for r in linhas.values() if r["status"] == "aberta")
+    print(f"[info] histórico completo: {len(linhas)} vagas em {caminho.name} ({abertas} abertas hoje)")
 
 
 # --------------------------- VAGAS MANUAIS ------------------------------
@@ -1413,6 +1489,10 @@ def main():
     if encerradas:
         novas = [v for v in novas if v["url"] not in encerradas]
         todas = [v for v in todas if v["url"] not in encerradas]
+    try:
+        atualizar_banco(todas, encerradas, agora)       # antes do histórico do site, que remove encerradas
+    except Exception as e:
+        print(f"[aviso] histórico completo (CSV) não foi atualizado: {e}")
     atualizar_historico(todas, agora, encerradas, conferidas)
     print(f"[info] fora do .txt do WhatsApp (continuam no site): {fora_da_regiao} fora das "
           f"regiões, {sem_local} sem informação de local")
