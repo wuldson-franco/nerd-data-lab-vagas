@@ -980,6 +980,35 @@ def _obter_html(url, nav=None):
     return r.text
 
 
+_UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split()
+_RE_CIDADE_UF = re.compile(r"([A-ZÀ-Ú][A-Za-zÀ-ÿ.'\- ]{2,35}?)\s*[/,\-]\s*(" + "|".join(_UFS) + r")\b")
+_RE_MODELO_EXPLICITO = re.compile(r"\b(presencial|h[ií]brido|remoto)\b", re.I)
+
+
+def _local_da_pagina(html):
+    """Local escrito de forma explícita na página (ex.: 'Presencial · CLT · Recife/PE').
+    Devolve (local, modelo) ou ("", ""). Só aceita 'Cidade/UF' com UF válida e,
+    para o modelo, a palavra precisa estar logo antes do local (nada de adivinhar)."""
+    if not html:
+        return "", ""
+    t = re.sub(r"(?is)<(script|style).*?</\1>", " ", html)
+    t = re.sub(r"<[^>]+>", " | ", t)
+    t = re.sub(r"\s+", " ", t)
+    for m in _RE_CIDADE_UF.finditer(t):
+        cidade = m.group(1).strip(" |.-")
+        if len(cidade.split()) > 4 or "|" in cidade:
+            continue
+        antes = t[max(0, m.start() - 80):m.start()]
+        mm = list(_RE_MODELO_EXPLICITO.finditer(antes))
+        modelo = ""
+        if mm:
+            w = norm(mm[-1].group(1))
+            modelo = "remote" if w == "remoto" else "hybrid" if w == "hibrido" else "on-site"
+        if modelo or m.start() < 3000:        # com palavra de modelo ao lado, ou no topo da página
+            return f"{cidade}, {m.group(2)}", modelo
+    return "", ""
+
+
 def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=15, nav=None):
     """Página-lista sem código padrão: pega os links cujo texto parece vaga de dados e abre cada
     um só para ler a data de publicação. O modelo (remoto etc.) NÃO é deduzido do texto da página,
@@ -1021,15 +1050,20 @@ def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=
         print(f"[debug] Carreiras - {nome}: primeiros textos de link: {amostra}")
     vagas = []
     for texto, href in candidatos[:max_paginas]:
-        data = ""
+        data, local, modelo_pag = "", "", ""
         try:
-            data = _data_publicada(_obter_html(href))
-            if not data and nav is not None:        # a data pode ser montada por JavaScript
-                data = _data_publicada(_obter_html(href, nav))
+            pag = _obter_html(href)
+            data = _data_publicada(pag)
+            local, modelo_pag = _local_da_pagina(pag)
+            if (not data or not local) and nav is not None:        # pode ser montado por JavaScript
+                pag = _obter_html(href, nav)
+                data = data or _data_publicada(pag)
+                if not local:
+                    local, modelo_pag = _local_da_pagina(pag)
         except Exception:
             pass
-        vagas.append(_vaga_de_empresa(nome, texto, href, "",
-                                      _modelo_por_texto(texto, re_remoto, re_hibrido), data))
+        modelo = modelo_pag or _modelo_por_texto(texto, re_remoto, re_hibrido)
+        vagas.append(_vaga_de_empresa(nome, texto, href, local, modelo, data))
         time.sleep(1)
     return vagas, candidatos
 
@@ -1189,7 +1223,7 @@ def _linha_de_vaga(v, hoje, existente=None):
     return {
         "id": _id_da_vaga(v["url"]), "titulo": v["titulo"], "empresa": v.get("empresa", ""),
         "url": v["url"], "nivel": v.get("nivel", ""), "area": v.get("area", ""),
-        "modelo": v["modelo"] if v.get("modelo") in ("remote", "hybrid") else "on-site",
+        "modelo": v["modelo"] if v.get("modelo") in ("remote", "hybrid", "indefinido") else "on-site",
         "cidade": v.get("cidade", ""), "estado": v.get("estado_nome", ""),
         "regiao": v.get("regiao", ""), "fonte": v.get("fonte", ""),
         "publicada": f"{d:%Y-%m-%d}" if d else antiga.get("publicada", ""),
@@ -1353,7 +1387,7 @@ def atualizar_historico(todas, agora, removidas=(), conferidas=None):
             "url": v["url"],
             "nivel": v["nivel"],
             "area": v["area"],
-            "modelo": v["modelo"] if v["modelo"] in ("remote", "hybrid") else "on-site",
+            "modelo": v["modelo"] if v["modelo"] in ("remote", "hybrid", "indefinido") else "on-site",
             "cidade": v.get("cidade", ""),
             "estado": v.get("estado_nome", ""),
             "regiao": v.get("regiao", "Remoto" if v["modelo"] == "remote" else "Outras regiões"),
@@ -1381,7 +1415,11 @@ def montar_texto(vagas, agora) -> str:
     emoji = {"Júnior": "🌱", "Pleno": "🚀", "Sênior": "🏆",
              "Nível não informado": "🔎", "Estágio": "🎓"}
     por_nivel = {n: [] for n in ordem}
+    sem_local = []
     for v in vagas:
+        if v["modelo"] == "indefinido":
+            sem_local.append(v)
+            continue
         por_nivel[v["nivel"]].append(v)
 
     linhas = [
@@ -1407,6 +1445,15 @@ def montar_texto(vagas, agora) -> str:
                 tag = f" 📍 presencial{sufixo}"
             nome = f"{v['titulo']} | {v['empresa']}" if v["empresa"] else v["titulo"]
             linhas.append(f"[{nome}]{tag}")
+            linhas.append(v["url"])
+            linhas.append("")
+    if sem_local:
+        linhas.append("━ SEM LOCAL INFORMADO 🔗")
+        linhas.append("A empresa não informa cidade nem modelo. Confira no link antes de se candidatar.")
+        linhas.append("")
+        for v in sorted(sem_local, key=lambda v: (v["nivel"], norm(v["titulo"]))):
+            nome = f"{v['titulo']} | {v['empresa']}" if v["empresa"] else v["titulo"]
+            linhas.append(f"[{nome}] ({v['nivel']})")
             linhas.append(v["url"])
             linhas.append("")
     return "\n".join(linhas).rstrip() + "\n"
@@ -1469,11 +1516,16 @@ def main():
             regiao = achar_regiao(texto, v["estado"])
             v["regiao"] = regiao or "Outras regiões"
             if not regiao and not manual:
-                vai_pro_whats = False
                 if v["texto_local"]:
+                    vai_pro_whats = False
                     fora_da_regiao += 1
                 else:
                     sem_local += 1
+                    if v["modelo"] == "hybrid":
+                        vai_pro_whats = False     # híbrido sem cidade: não dá para saber se é da região
+                    else:
+                        v["modelo"] = "indefinido"   # não sabemos: nunca chamar de "presencial"
+                        v["regiao"] = "Local não informado"
         if SOMENTE_REMOTO and v["modelo"] != "remote" and not manual:
             vai_pro_whats = False
         if not manual and not recente(v.get("publicada"), agora, DIAS_VAGA_RECENTE):
