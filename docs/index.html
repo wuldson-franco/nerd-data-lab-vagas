@@ -208,7 +208,7 @@ a{color:inherit}
   const $ = s => document.querySelector(s);
   const NIVEIS = [["Júnior","jr"],["Pleno","pl"],["Sênior","sr"],["Estágio","es"],["Nível não informado","nd"]];
   const ROTULO_NIVEL = {"Nível não informado":"Sem nível"};
-  const MODELOS = [["remote","Remoto"],["hybrid","Híbrido"],["on-site","Presencial"]];
+  const MODELOS = [["remote","Remoto"],["hybrid","Híbrido"],["on-site","Presencial"],["indefinido","Local não informado"]];
   let REGIOES = ["João Pessoa e região","Campina Grande e região","Recife e região","Natal e região"];  // o robô envia a lista atual em vagas.json
   const OUTRAS = "Outras regiões";
   const CHAVES = ["q","area","nivel","modelo","regiao","estado","fonte","empresa","periodo"];
@@ -308,6 +308,7 @@ a{color:inherit}
   /* ---------- lista ---------- */
   function ondeTexto(v) {
     if (v.modelo === "remote") return "Remoto";
+    if (v.modelo === "indefinido") return "Local não informado";
     const local = v.cidade ? v.cidade + (v.estado ? " - " + uf(v.estado) : "") : (v.estado || (v.regiao !== OUTRAS ? v.regiao : ""));
     return rotuloModelo(v.modelo) + (local ? ", " + local : "");
   }
@@ -419,7 +420,7 @@ a{color:inherit}
     const areas = [...contar(null, v => v.area)].sort((a, b) => b[1] - a[1]).map(([a]) => [a, a]);
     opcoes($("#fArea"), [["", "qualquer área"], ...areas]);
     opcoes($("#fNivel"), [["", "qualquer nível"], ...NIVEIS.map(([n]) => [n, rotuloNivel(n).toLowerCase()])]);
-    opcoes($("#fModelo"), [["", "qualquer modelo"], ["remote", "remoto"], ["hybrid", "híbrido"], ["on-site", "presencial"]]);
+    opcoes($("#fModelo"), [["", "qualquer modelo"], ["remote", "remoto"], ["hybrid", "híbrido"], ["on-site", "presencial"], ["indefinido", "local não informado"]]);
     const estados = [...new Set(dados.map(v => v.estado).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
     $("#fRegiao").innerHTML = '<option value="">qualquer lugar</option>'
       + '<optgroup label="Regiões">' + [...REGIOES, OUTRAS].map(r => `<option value="r:${esc(r)}">${esc(r)}</option>`).join("") + '</optgroup>'
