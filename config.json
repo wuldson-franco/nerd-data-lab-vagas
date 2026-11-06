@@ -158,7 +158,9 @@
         {"nome": "Neon", "url": "https://jobs.lever.co/neon"},
         {"nome": "Zup", "url": "https://job-boards.greenhouse.io/zupinnovation"},
         {"nome": "Mercado Livre", "url": "https://careers-meli.mercadolibre.com/pt", "javascript": true},
-        {"nome": "CWI", "url": "https://cwi.com.br/talentos/oportunidades/"}
+        {"nome": "CWI", "url": "https://cwi.com.br/talentos/oportunidades/"},
+        {"nome": "A3Data", "url": "https://sites.google.com/a3data.com.br/paginadevagas/nossas-vagas", "javascript": true},
+        {"nome": "FSBR", "url": "https://selecao.fsbr.com.br/portal", "javascript": true}
       ]
     },
     "remotive": {
