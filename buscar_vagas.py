@@ -23,6 +23,7 @@ import time
 import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import requests
@@ -648,7 +649,21 @@ def buscar_jooble(agora, cfg):
     return vagas
 
 
+def _melhor_link(links, evitar):
+    """Entre os links para se candidatar, prefere um que não seja de agregador (lista
+    'evitar_links_de' do config). Se todos forem de agregador, usa o primeiro."""
+    if not links:
+        return ""
+    evitar = [norm(x) for x in (evitar or []) if x]
+    for l in links:
+        host = norm(urlsplit(l).netloc)
+        if not any(x in host for x in evitar):
+            return l
+    return links[0]
+
+
 def buscar_google(agora, cfg):
+    evitar = cfg.get("evitar_links_de", [])
     chave = os.environ.get("SERPAPI_KEY", "").strip()
     if not chave:
         print("[info] Google pulada: falta o Secret SERPAPI_KEY.")
@@ -730,7 +745,7 @@ def buscar_google(agora, cfg):
                 if data and not recente(data.isoformat(), agora):
                     continue
                 apply = [a.get("link") for a in (j.get("apply_options") or []) if a.get("link")]
-                link = apply[0] if apply else j.get("share_link", "")
+                link = _melhor_link(apply, evitar) or j.get("share_link", "")
                 titulo = _sem_html(j.get("title") or j.get("job_title"))
                 loc = j.get("location", "")
                 cidade, estado_nome = separar_local(loc)
@@ -1122,6 +1137,9 @@ def buscar_empresas(agora, cfg):
             continue
         recentes = [v for v in achadas if v["url"].startswith(("http://", "https://"))
                     and recente(v["publicada"], agora)]
+        if e.get("fonte"):                       # ex.: "Networking PB" aparece como fonte própria
+            for v in recentes:
+                v["fonte"] = e["fonte"]
         de_dados = [v for v in recentes if e_vaga_de_dados(v["titulo"])]
         print(f"[debug] Carreiras - {nome} ({tipo}): {len(brutas)} vagas na página, "
               f"{len(recentes)} recentes, {len(de_dados)} de dados")

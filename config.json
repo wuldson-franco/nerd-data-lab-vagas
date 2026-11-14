@@ -165,6 +165,7 @@
         "analista de dados nubank"
       ],
       "paginas_por_busca": 1,
+      "evitar_links_de": ["trabajo.org", "bebee", "talent.com", "jooble", "geekhunter", "empregos.com.br", "univision"],
       "limite": {"tipo": "mensal", "maximo": 220},
       "palavras_remoto": ["remoto", "remota", "remote", "home office", "homeoffice", "trabalho em casa", "trabalho de casa", "work from home", "qualquer lugar", "anywhere"],
       "palavras_hibrido": ["hibrido", "hibrida", "hybrid"]
@@ -182,7 +183,8 @@
         {"nome": "Mercado Livre", "url": "https://careers-meli.mercadolibre.com/pt", "javascript": true},
         {"nome": "CWI", "url": "https://cwi.com.br/talentos/oportunidades/"},
         {"nome": "A3Data", "url": "https://sites.google.com/a3data.com.br/paginadevagas/nossas-vagas", "javascript": true},
-        {"nome": "FSBR", "url": "https://selecao.fsbr.com.br/portal", "javascript": true}
+        {"nome": "FSBR", "url": "https://selecao.fsbr.com.br/portal", "javascript": true},
+        {"nome": "Networking PB", "url": "https://networkingpb.com.br/categorias/tecnologia", "fonte": "Networking PB"}
       ]
     },
     "remotive": {
