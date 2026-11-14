@@ -997,6 +997,8 @@ def _obter_html(url, nav=None):
 
 _UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split()
 _RE_CIDADE_UF = re.compile(r"([A-ZÀ-Ú][A-Za-zÀ-ÿ.'\- ]{2,35}?)\s*[/,\-]\s*(" + "|".join(_UFS) + r")\b")
+_RE_MODELO_CELULA = re.compile(
+    r"(?:^|\|)\s*(remoto|h[ií]brido|presencial)\s*\|\s*(?:clt|pj|est[aá]gio|tempor[aá]rio|aprendiz|freelancer|cooperado|trainee)\b", re.I)
 _RE_MODELO_EXPLICITO = re.compile(r"\b(presencial|h[ií]brido|remoto)\b", re.I)
 
 
@@ -1009,6 +1011,12 @@ def _local_da_pagina(html):
     t = re.sub(r"(?is)<(script|style).*?</\1>", " ", html)
     t = re.sub(r"<[^>]+>", " | ", t)
     t = re.sub(r"\s+", " ", t)
+    t = re.sub(r"(\|\s*)+", "| ", t)          # células vazias viram uma só
+    celula = _RE_MODELO_CELULA.search(t)       # "Remoto | CLT | Tecnologia" no topo da vaga
+    modelo_celula = ""
+    if celula:
+        w = norm(celula.group(1))
+        modelo_celula = "remote" if w == "remoto" else "hybrid" if w == "hibrido" else "on-site"
     for m in _RE_CIDADE_UF.finditer(t):
         cidade = m.group(1).strip(" |.-")
         if len(cidade.split()) > 4 or "|" in cidade:
@@ -1020,8 +1028,22 @@ def _local_da_pagina(html):
             w = norm(mm[-1].group(1))
             modelo = "remote" if w == "remoto" else "hybrid" if w == "hibrido" else "on-site"
         if modelo or m.start() < 3000:        # com palavra de modelo ao lado, ou no topo da página
-            return f"{cidade}, {m.group(2)}", modelo
-    return "", ""
+            return f"{cidade}, {m.group(2)}", modelo or modelo_celula
+    return "", modelo_celula
+
+
+def _empresa_da_pagina(html, titulo):
+    """Em portais que divulgam vagas de terceiros (ex.: Networking PB) o nome da empresa vem logo
+    depois do título repetido: 'Título | XX | Título | Empresa | Remoto'. Devolve '' se não achar."""
+    if not html or not titulo:
+        return ""
+    t = re.sub(r"(?is)<(script|style).*?</\1>", " ", html)
+    t = re.sub(r"<[^>]+>", " | ", t)
+    t = re.sub(r"\s+", " ", t)
+    t = re.sub(r"(\|\s*)+", "| ", t)
+    tit = re.escape(re.sub(r"\s+", " ", titulo).strip())
+    m = re.search(tit + r"\s*\|\s*[A-Z0-9]{1,3}\s*\|\s*" + tit + r"\s*\|\s*([^|]{2,60}?)\s*\|", t)
+    return m.group(1).strip() if m else ""
 
 
 def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=15, nav=None):
@@ -1065,11 +1087,12 @@ def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=
         print(f"[debug] Carreiras - {nome}: primeiros textos de link: {amostra}")
     vagas = []
     for texto, href in candidatos[:max_paginas]:
-        data, local, modelo_pag = "", "", ""
+        data, local, modelo_pag, empresa_pag = "", "", "", ""
         try:
             pag = _obter_html(href)
             data = _data_publicada(pag)
             local, modelo_pag = _local_da_pagina(pag)
+            empresa_pag = _empresa_da_pagina(pag, texto)
             if (not data or not local) and nav is not None:        # pode ser montado por JavaScript
                 pag = _obter_html(href, nav)
                 data = data or _data_publicada(pag)
@@ -1078,7 +1101,7 @@ def _vagas_por_links(nome, url, html, agora, re_remoto, re_hibrido, max_paginas=
         except Exception:
             pass
         modelo = modelo_pag or _modelo_por_texto(texto, re_remoto, re_hibrido)
-        vagas.append(_vaga_de_empresa(nome, texto, href, local, modelo, data))
+        vagas.append(_vaga_de_empresa(empresa_pag or nome, texto, href, local, modelo, data))
         time.sleep(1)
     return vagas, candidatos
 
