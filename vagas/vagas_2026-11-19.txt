@@ -1,0 +1,85 @@
+#nerddatalab | Vagas de dados, 19/11 📊
+
+Candidate-se hoje mesmo nas que fazem sentido pro seu perfil. 💡
+
+━ JÚNIOR 🌱
+
+[Analista de Governança de Dados JR | Grupo SysMap] 🏠 remoto
+https://gruposysmap.gupy.io/jobs/12879353?jobBoardSource=gupy_public_page&utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Pessoa Analista de Dados Júnior | Datum] 🏠 remoto
+https://www.jobleads.com/br/job/pessoa-analista-de-dados-junior--brazil--e448683a7e7ad9c9fbf5f53415579fd8b?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+━ PLENO 🚀
+
+[ENGENHEIRO DE DADOS PL | Stefanini Group] 🏠 remoto
+https://stefanini.gupy.io/job/eyJqb2JJZCI6MTI4OTk5NzYsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal
+
+━ SÊNIOR 🏆
+
+[[Job - 32752] Senior Data Analyst, Brazil | Ci&T] 🏠 remoto
+https://jobgether.com/offer/6afe0b2a8acd9c1f9b280313-job---32752-senior-data-analyst-brazil?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Analista de Governança de Dados SR | Grupo SysMap] 🏠 remoto
+https://gruposysmap.gupy.io/job/eyJqb2JJZCI6MTI5MDQ4NjIsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal
+
+[Business Analytics Sênior - Pagamentos | Caju] 🏠 remoto
+https://caju.gupy.io/jobs/12810865?jobBoardSource=gupy_public_page&utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[CIENTISTA DE DADOS SR | Stefanini Group] 🏠 remoto
+https://stefanini.gupy.io/job/eyJqb2JJZCI6MTI5MjMxMTIsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal
+
+[Engenheiro de Dados Sênior – Foco em Operações | Extractta] 🏠 remoto
+https://br.indeed.com/viewjob?jk=5f2485e8b5c33585&utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Engenheiro de Dados Sr. | PagBank] 🏠 remoto
+https://pagseguro.gupy.io/job/eyJqb2JJZCI6MTI5MDQ0MjcsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal
+
+[Senior Data Analyst | Argyle] 🏠 remoto
+https://br.indeed.com/viewjob?jk=e6bd79421b3dfc34&utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Senior Data Analyst - Remote - Latin America | Kake] 🏠 remoto
+https://www.jobleads.com/br/job/senior-data-analyst-remote-latin-america--florianopolis--e746af13a1cccb58fb304468df0d97a6e?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Senior Machine Learning Engineer (Computer Vision) | Ruzora] 🏠 remoto
+https://bebee.com/br/jobs/senior-machine-learning-engineer-computer-vision-ruzora--t7xk-949632263?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+━ NÍVEL NÃO INFORMADO 🔎
+
+[[Job- 32659] Mid-Level Data Analytics (Power BI), Brazil | CI&T] 🏠 remoto
+https://bebee.com/br/jobs/job-32659-mid-level-data-analytics-power-bi-brazil-cit-remoto--t7xk-935213059?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Analytics Engineer | Hvar Consulting] 🏠 remoto
+https://www.glassdoor.com.br/job-listing/analytics-engineer-hvar-consulting-JV_IC2479061_KO0,18_KE19,34.htm?jl=1009644260633&utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Cientista de Dados Especialista - Prevenção à Fraude | Grupo SysMap] 🏠 remoto
+https://gruposysmap.gupy.io/job/eyJqb2JJZCI6MTI5MTY4NDYsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal
+
+[Cientista de Dados | Machine Learning & Produtização | Semantix] 🏠 remoto
+https://www.jobleads.com/br/job/cientista-de-dados-machine-learning-produtizacao--sao-paulo--londrina--ec7183d07a4a47af37c97536e82c87754?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Data Engineer (Python & Playwright) - Remote Work | BairesDev] 🏠 remoto
+https://bebee.com/br/jobs/data-engineer-python-playwright-remote-work-bairesdev-sao-bernardo-do-campo--techmap_br_4491712512?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Data Engineer (Snowflake & Databricks) | HCLTech] 🏠 remoto
+https://br.linkedin.com/jobs/view/data-engineer-snowflake-databricks-at-hcltech-4491865299?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Data Quality | Jump] 🏠 remoto
+https://jump.inhire.app/vagas/e91cdfbe-a394-4614-9a6e-331a1e3ca754/-?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Desenvolvedor(a) Especialista I – Engenharia de Dados (Kafka | AWS) | Jamefy] 🏠 remoto
+https://www.jobleads.com/br/job/desenvolvedor-a-especialista-i-engenharia-de-dados-kafka-aws--brazil--e9f6bcc8ddc9d215ec56c8a15af39252a?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[FBS Business System Analyst (SQL & Power BI) | confidential] 🏠 remoto
+https://www.recruit.net/job/fbs-business-system-analyst-sql-jobs/8D4F7FC3BCACAA2F?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
+
+[Machine Learning Enginner | Memed ativo] 🏠 remoto
+https://memed.gupy.io/job/eyJqb2JJZCI6MTI5MjE4NjAsInNvdXJjZSI6Imd1cHlfcG9ydGFsIn0=?jobBoardSource=gupy_portal
+
+[Staff Machine Learning Engineer | Neon] 🏠 remoto
+https://jobs.lever.co/neon/f4385bb6-dcdc-4519-836f-4437b29662f8
+
+━ ESTÁGIO 🎓
+
+[Estágio: Dados e Inteligência Artificial | INFNET] 🏠 remoto
+https://www.nerdin.com.br/vaga_emprego/vaga-estagio-dados-e-inteligencia-artificial-100735.php?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic
